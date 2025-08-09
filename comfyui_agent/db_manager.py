@@ -118,14 +118,20 @@ def upsert_job(db_path: str, job_data: Dict[str, Any]) -> int:
             job_id = existing["id"]
             existing_status = existing["status"]
             
-            # Don't regress terminal states
-            if existing_status in ("done", "failed"):
-                # Only update non-critical fields
+            # Handle terminal states
+            if existing_status == "done":
+                # Don't reprocess completed jobs - only update priority if provided
                 if "priority" in job_data:
                     cursor.execute(
                         "UPDATE jobs SET priority = ? WHERE id = ?",
                         (job_data["priority"], job_id)
                     )
+            elif existing_status == "failed":
+                # Reset failed jobs so they can be retried
+                cursor.execute(
+                    "UPDATE jobs SET status = 'pending', retries_attempted = 0, priority = ? WHERE id = ?",
+                    (job_data.get("priority", 50), job_id)
+                )
             else:
                 # Update all provided fields
                 update_fields = []

@@ -119,7 +119,30 @@ def validate_config_schema(cfg: Dict[str, Any], workflows: Dict[str, Any]) -> No
     if "required_inputs" in workflows[workflow_id]:
         required_inputs = workflows[workflow_id]["required_inputs"]
         provided_inputs = cfg.get("inputs", {})
-        missing_inputs = [inp for inp in required_inputs if inp not in provided_inputs]
+        
+        # Check for both generic and node-specific inputs
+        missing_inputs = []
+        for inp in required_inputs:
+            # First check if generic input exists
+            if inp not in provided_inputs:
+                # Check if any node-specific version exists
+                node_specific_found = False
+                
+                # Special case: "prompt" can be satisfied by "_text" fields
+                if inp == "prompt":
+                    node_specific_found = any(
+                        "_text" in key for key in provided_inputs.keys()
+                    )
+                
+                # General case: check for node-specific version (e.g., "31_seed" for "seed")
+                if not node_specific_found:
+                    node_specific_found = any(
+                        key.endswith(f"_{inp}") for key in provided_inputs.keys()
+                    )
+                
+                if not node_specific_found:
+                    missing_inputs.append(inp)
+        
         if missing_inputs:
             raise ValueError(f"Missing required inputs: {missing_inputs}")
     

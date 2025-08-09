@@ -147,10 +147,8 @@ def build_payload(workflow_id: str, inputs: Dict[str, Any],
     workflow_def = workflows[workflow_id]
     required_inputs = workflow_def.get("required_inputs", [])
     
-    # Check required inputs
-    missing = [inp for inp in required_inputs if inp not in inputs]
-    if missing:
-        raise ValueError(f"Missing required inputs: {missing}")
+    # Skip validation here - it's already done in validation.py
+    # We trust the inputs are in node-specific format (e.g., "45_text", "31_seed")
     
     # Load workflow template JSON
     template_path = workflow_def.get("template_path")
@@ -171,23 +169,34 @@ def build_payload(workflow_id: str, inputs: Dict[str, Any],
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in template: {e}")
     
-    # Map inputs to workflow nodes
-    # This is a simplified mapping - real implementation would be more sophisticated
+    # Map node-specific inputs to workflow nodes
+    # Format: "nodeID_parameter" (e.g., "45_text", "31_seed")
+    for key, value in inputs.items():
+        # Skip special keys
+        if key == "outputs" or key.startswith("job_"):
+            continue
+            
+        # Check if this is a node-specific input
+        if "_" in key:
+            parts = key.split("_", 1)
+            if len(parts) == 2:
+                node_id, param = parts
+                
+                # Check if this node exists in the workflow
+                if node_id in workflow_template and "inputs" in workflow_template[node_id]:
+                    node_inputs = workflow_template[node_id]["inputs"]
+                    
+                    # Update the parameter if it exists in this node
+                    if param in node_inputs:
+                        node_inputs[param] = value
+                        logger.debug(f"Mapped {key} -> Node {node_id}.{param} = {value}")
+                    else:
+                        logger.warning(f"Parameter '{param}' not found in node {node_id}")
+    
+    # Handle output paths for SaveImage nodes
     for node_id, node in workflow_template.items():
-        if "inputs" in node:
-            node_inputs = node["inputs"]
-            
-            # Map common input fields
-            if "seed" in node_inputs and "seed" in inputs:
-                node_inputs["seed"] = inputs["seed"]
-            
-            if "text" in node_inputs and "prompt" in inputs:
-                node_inputs["text"] = inputs["prompt"]
-            elif "prompt" in node_inputs and "prompt" in inputs:
-                node_inputs["prompt"] = inputs["prompt"]
-            
-            if "steps" in node_inputs and "steps" in inputs:
-                node_inputs["steps"] = inputs["steps"]
+        if "inputs" not in node:
+            continue
             
             # Handle output paths if specified
             if node.get("class_type") == "SaveImage" and "outputs" in inputs:
@@ -335,6 +344,8 @@ def execute_job(job: Dict[str, Any], cfg: Dict[str, Any],
         
         # Build payload
         inputs = job_config.get("inputs", {})
+        # Add outputs to inputs so build_payload can map them
+        inputs["outputs"] = job_config.get("outputs", {})
         logger.info(f"[EXECUTE] Building payload for workflow: {job['workflow_id']}")
         logger.info(f"[EXECUTE] Inputs: {inputs}")
         payload = build_payload(job["workflow_id"], inputs, workflows)
@@ -358,11 +369,16 @@ def execute_job(job: Dict[str, Any], cfg: Dict[str, Any],
             "metadata": json.dumps(metadata)
         })
         
-        # Move YAML to finished
-        job_type_folder = config_name.split("_")[0]
-        finished_dir = os.path.join(cfg["paths"]["jobs_finished"], job_type_folder)
+        # Move YAML to finished, preserving subfolder structure
+        # Get relative path from processing folder
+        processing_base = cfg["paths"]["jobs_processing"]
+        relative_path = os.path.relpath(yaml_path, processing_base)
+        
+        # Build finished path with same subfolder structure
+        finished_path = os.path.join(cfg["paths"]["jobs_finished"], relative_path)
+        finished_dir = os.path.dirname(finished_path)
         os.makedirs(finished_dir, exist_ok=True)
-        finished_path = os.path.join(finished_dir, config_name)
+        
         safe_move(yaml_path, finished_path)
         
         logger.info(f"[EXECUTE] ✅ Job {config_name} completed successfully!")
@@ -403,31 +419,42 @@ def run_once(cfg: Dict[str, Any], workflows: Dict[str, Any],
     if recovered > 0:
         logger.info(f"[EXECUTOR] Recovered {recovered} orphaned jobs")
     
-    # Check what jobs exist in DB
+    # Check what jobs exist in DB (only in debug mode)
     import sqlite3
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, config_name, status, retries_attempted, retry_limit FROM jobs")
-    all_jobs = cursor.fetchall()
     
-    if all_jobs:
-        logger.info(f"[EXECUTOR] Jobs in database:")
-        for job in all_jobs:
-            logger.info(f"  - ID {job[0]}: {job[1]} | Status: {job[2]} | Retries: {job[3]}/{job[4]}")
-    else:
-        logger.info(f"[EXECUTOR] No jobs in database")
+    # Only show detailed job list in debug mode
+    if logger.isEnabledFor(10):  # DEBUG level
+        cursor.execute("SELECT id, config_name, status, retries_attempted, retry_limit FROM jobs")
+        all_jobs = cursor.fetchall()
+        
+        if all_jobs:
+            logger.debug(f"[EXECUTOR] Jobs in database:")
+            for job in all_jobs:
+                logger.debug(f"  - ID {job[0]}: {job[1]} | Status: {job[2]} | Retries: {job[3]}/{job[4]}")
+        else:
+            logger.debug(f"[EXECUTOR] No jobs in database")
     
     cursor.execute("SELECT COUNT(*) FROM jobs WHERE status='pending'")
     pending_count = cursor.fetchone()[0]
-    logger.info(f"[EXECUTOR] Found {pending_count} pending job(s)")
+    
+    # Only log if there are pending jobs
+    if pending_count > 0:
+        logger.info(f"[EXECUTOR] Found {pending_count} pending job(s)")
+    else:
+        logger.debug(f"[EXECUTOR] No pending jobs")
+    
     conn.close()
     
     # Lease next job
-    logger.info(f"[EXECUTOR] Attempting to lease next job for worker {worker_id}")
+    if pending_count > 0:
+        logger.info(f"[EXECUTOR] Attempting to lease next job for worker {worker_id}")
+    
     job = lease_next_job(db_path, worker_id, lease_seconds=300)
     
     if not job:
-        logger.info(f"[EXECUTOR] No jobs available to process")
+        logger.debug(f"[EXECUTOR] No jobs available to process")
         return False  # No work available
     
     logger.info(f"[EXECUTOR] Successfully leased job ID {job['id']}: {job['config_name']}")
