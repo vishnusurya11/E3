@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2025-08-09T15:46:02.982316Z" agent="E3-Assistant" version="22.0.3">
+<diagram id="E3Phase1" name="Phase 1 Architecture">
+<mxGraphModel>
+<root>
+<mxCell id="0" parent="None"/>
+<mxCell id="1" parent="0"/>
+<mxCell id="n1" value="jobs/processing\n(image, video, audio, speech, 3d)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="80" y="140" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n2" value="Folder Monitor\n(watches FS, ingests YAML to DB)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="370" y="140" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n3" value="Queue Manager\n(priority + FIFO, God Mode)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="660" y="140" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n4" value="ComfyUI Agent\n(executor, API calls)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="950" y="140" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n5" value="ComfyUI Instance\n(single, always-on)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="1240" y="140" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n6" value="jobs/finished\n(outputs + YAML archive)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="660" y="420" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n7" value="SQLite DB\n(jobs: status, priority, retries, run_count, errors, timings)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="660" y="420" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="n8" value="UI Server\n(queue view, set priority, retry failed, safe writes)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+<mxGeometry x="80" y="420" width="240" height="110" as="geometry"/>
+</mxCell>
+<mxCell id="e1" edge="1" parent="1" source="n1" target="n2">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e2" edge="1" parent="1" source="n2" target="n3">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e3" edge="1" parent="1" source="n3" target="n4">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e4" edge="1" parent="1" source="n4" target="n5">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e5" edge="1" parent="1" source="n5" target="n6">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e6" edge="1" parent="1" source="n2" target="n7">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e7" edge="1" parent="1" source="n3" target="n7">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e8" edge="1" parent="1" source="n8" target="n7">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e9" edge="1" parent="1" source="n7" target="n8">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="e10" edge="1" parent="1" source="n5" target="n7">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+</root>
+</mxGraphModel>
+</diagram>
+</mxfile>
