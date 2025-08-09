@@ -1,6 +1,7 @@
 
 legacyfiles/
 .claude/
+jobs/
 .pytest*
 .venv*
 __py*
