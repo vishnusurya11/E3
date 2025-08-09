@@ -1,0 +1,20 @@
+# Sample Text-to-Video job configuration
+job_type: T2V
+workflow_id: wf_t2v_cinematic
+priority: 50  # Default priority
+
+inputs:
+  prompt: "A majestic eagle soaring through mountain peaks at sunset, golden hour lighting, cinematic camera movement"
+  seed: 12345
+  duration: 5  # seconds
+  fps: 24
+  resolution: "1920x1080"
+  motion_strength: 0.7
+
+outputs:
+  file_path: "jobs/finished/video/T2V_20250809143100_1_animation.mp4"
+  
+metadata:
+  creator: "ComfyUI Agent Sample"
+  version: "1.0"
+  notes: "Cinematic video generation test"

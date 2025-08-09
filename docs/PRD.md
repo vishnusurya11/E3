@@ -21,6 +21,7 @@ Future phases (config generation, placement/orchestration, combined workflows) w
 - Log metadata and errors in **SQLite**.
 - Provide a **local web UI** for job monitoring, priority adjustments, retries.
 - Implement **TDD-first** development (small, single-responsibility functions, unit tests).
+- Use **uv** for env/deps.
 
 ### Non-Goals
 - Config generation or placement logic (Phase 2+).
@@ -114,6 +115,10 @@ metadata:
 ### 4.4 Security (Local Scope)
 - Localhost UI only by default.
 - Future: optional auth if remote access is enabled.
+
+### 4.5 Developer Workflow
+- Use **uv venv**, **uv pip**, `pytest`, linters; always update
+- **README.md** and **tasks.md** when tasks change.
 
 ---
 

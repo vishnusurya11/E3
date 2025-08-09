@@ -1,0 +1,62 @@
+{
+  "prompt": {
+    "3": {
+      "class_type": "KSampler",
+      "inputs": {
+        "seed": 42,
+        "steps": 30,
+        "cfg": 7.5,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
+        "denoise": 1,
+        "model": ["4", 0],
+        "positive": ["6", 0],
+        "negative": ["7", 0],
+        "latent_image": ["5", 0]
+      }
+    },
+    "4": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "dreamshaper_8.safetensors"
+      }
+    },
+    "5": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "A majestic lion sitting on a cliff overlooking the savanna at sunset, golden hour lighting, photorealistic, highly detailed fur, 8k resolution, wildlife photography",
+        "clip": ["4", 1]
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",  
+      "inputs": {
+        "text": "blurry, bad quality, cartoon, anime, painting, illustration, worst quality, low quality, normal quality, lowres, low details, oversaturated, undersaturated, overexposed, underexposed",
+        "clip": ["4", 1]
+      }
+    },
+    "8": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": ["3", 0],
+        "vae": ["4", 2]
+      }
+    },
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "T2I_20250809141500_1_lion",
+        "images": ["8", 0]
+      }
+    }
+  },
+  "client_id": "e3_agent_worker_001"
+}

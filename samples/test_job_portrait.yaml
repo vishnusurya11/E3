@@ -1,0 +1,13 @@
+job_type: T2I
+workflow_id: wf_realistic_portrait
+priority: 20
+inputs:
+  prompt: "professional portrait of a software engineer, modern office background, natural lighting"
+  seed: 12345
+  steps: 30
+outputs:
+  file_path: "jobs/finished/image/engineer_portrait.png"
+metadata:
+  creator: "ComfyUI Agent Test"
+  version: "1.0"
+  notes: "Testing realistic portrait workflow"

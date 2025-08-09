@@ -1,0 +1,19 @@
+# Sample Text-to-Speech job configuration
+job_type: SPEECH
+workflow_id: wf_tts_natural
+priority: 10  # High priority
+
+inputs:
+  text: "Welcome to the E3 ComfyUI Agent. This powerful system orchestrates AI media generation across multiple modalities, ensuring efficient processing and reliable results."
+  voice_model: "natural_english_v2"
+  speed: 1.0
+  pitch: 0
+  emotion: "professional"
+
+outputs:
+  file_path: "jobs/finished/speech/SPEECH_20250809143200_1_narration.wav"
+  
+metadata:
+  creator: "ComfyUI Agent Sample"
+  version: "1.0"
+  notes: "Natural voice synthesis test"

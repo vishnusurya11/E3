@@ -1,0 +1,7 @@
+
+legacyfiles/
+.claude/
+.pytest*
+.venv*
+__py*
+*.db

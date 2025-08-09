@@ -1,112 +1,55 @@
 # Ember 3 (E3) – PRFAQ
 ## Phase 1: ComfyUI Agent
 
+**Date:** 2025-08-09  
+**Owner:** ViSuReNa
+
+---
+
 ## Press Release
 
-**Date:** TBD  
-**From:** ViSuReNa LLC  
-**Subject:** Launch of Ember 3 – Phase 1: ComfyUI Agent
+Seattle, WA — ViSuReNa announces **Ember 3 (E3)**, a modular AI media generation system designed to automate the creation of images, video, audio, speech, and 3D assets. **Phase 1** delivers the **ComfyUI Agent**, a local execution engine that monitors a folder for YAML configs, queues them in SQLite, and executes them through a **single always-on ComfyUI instance** (via HTTP API at a configurable `comfyui.endpoint`).
 
-Seattle, WA — ViSuReNa proudly announces **Ember 3 (E3)**, the next evolution of its AI media generation ecosystem.  
-E3 is designed as a multi-phase, modular system that automates the creation of AI-generated stories, music, audio, and videos for YouTube and beyond.  
+**Highlights**
+- Unified YAML configs across modalities (T2I, T2V, AUDIO, SPEECH, 3D).
+- Global **priority queue** (lower number = higher priority; default 50).
+- Two continuous loops: **Monitor** (filesystem→DB) and **Scheduler/Executor** (DB→ComfyUI).
+- **SQLite logging** of status, timings, retries, and errors.
+- Local **web UI** to view queue, change priority, retry failed jobs, and view errors.
+- **TDD-first** codebase; tiny, single-responsibility functions; slim module layout.
 
-**Phase 1** launches with the **ComfyUI Agent**, a dedicated execution engine that processes AI job configs through a single ComfyUI instance.  
-This agent handles the detection, prioritization, execution, and logging of jobs, providing a foundation for scalability and future automation.
-
-Key features of the ComfyUI Agent:
-- **Unified Config Format** for all asset types (T2I, T2V, Speech, Audio, 3D, etc.).
-- **Global Priority Queue** for optimized execution order.
-- **Automatic Folder Monitoring** (`processing` → `finished`).
-- **SQLite-Powered Job Tracking** for metadata, timing, and error logging.
-- **Local Web UI** to monitor, reprioritize, and debug jobs in real-time.
-- **TDD Compliance** for reliability and maintainability.
+This forms the foundation for later phases (config generation, placement, orchestration, cloud backends).
 
 ---
 
 ## FAQ
 
-### 1. What problem does Phase 1 solve?
-E3 Phase 1 addresses the execution bottleneck in AI media generation.  
-Previously, jobs were run in large batches without fine-grained control or tracking.  
-The ComfyUI Agent introduces:
-- Single-job configs for easier debugging
-- Global prioritized execution
-- Automatic logging & error tracking
-- Real-time UI for queue control
+### What problem does Phase 1 solve?
+Previous Ember iterations generated quality assets but lacked a robust, observable execution layer. Phase 1 introduces a **DB-backed scheduler**, **file-to-DB ingestion**, and a **UI** for control and debugging.
 
----
+### How does it work?
+- Drop a YAML config into `jobs/processing/<type>/`.  
+- **Monitor** validates & inserts it into **SQLite** as `pending`.  
+- **Scheduler/Executor** leases the next job (by priority & FIFO), calls ComfyUI via `comfyui.endpoint`, and writes outputs to `jobs/finished/<type>/`.  
+- Status, timings, retries, and errors are logged in the DB and visible in the UI.
 
-### 2. How does the ComfyUI Agent work?
-- **Two Continuous Loops**:
-  1. **Monitor Loop**: Watches a `processing` folder and writes valid configs into SQLite as `pending` jobs.
-  2. **Scheduler/Executor Loop**: Continuously picks the highest-priority pending job from SQLite and executes it via ComfyUI API.
-- **Folder Monitoring:** Watches `processing` subfolders for each media type (`image/`, `video/`, `audio/`, `speech/`, `3d/`).
-- **Config Files:** Each YAML job file includes inputs, outputs, and priority (lower = higher priority, default = 50).
-- **Execution:** The ComfyUI Agent calls the ComfyUI API with the mapped workflow template.
-- **Lifecycle:** On success, the config moves to `finished/`; on failure, it retries (configurable), logs errors, and updates SQLite.
-- **UI:** Local dashboard displays all jobs, priorities, errors, and performance metrics.
+### Why one config per job?
+It makes execution **scalable**, **traceable**, and **reproducible**, with clean failure isolation.
 
----
+### How are priorities handled?
+**Lower number = higher priority**. God Mode sets priority to `1`. The current job is never pre-empted; God Mode runs next.
 
-### 3. Why single configs instead of bulk jobs?
-Single configs improve scalability, efficiency, debugging, and reproducibility.
+### What happens on failure?
+The job’s `run_count` increments; if under the (per-job or global) `retry_limit`, it’s requeued. On final failure it’s marked `failed` with full `error_trace` for UI display.
 
----
+### What’s in the database?
+`jobs` table with `config_name`, `job_type`, `workflow_id`, `priority`, `status`, `run_count`, `retries_attempted`, `retry_limit`, `start_time`, `end_time`, `duration`, `error_trace`, `metadata`, and leasing fields (`worker_id`, `lease_expires_at`).
 
-### 4. How is priority handled?
-Lower number = higher priority (1 = top priority, 50 = default).  
-Jobs are executed in global priority order across all media types.  
-God Mode pushes a job to the top of the queue without interrupting the current run.
+### What is the ComfyUI requirement?
+A **single always-on** ComfyUI instance reachable at `comfyui.endpoint` (full URL, e.g., `http://127.0.0.1:8188`).
 
----
+### What is the development approach?
+**TDD-first** with tiny, single-responsibility functions, full type hints, and CI that runs `pytest` + linters. Use **uv** for dependency management.
 
-### 5. How are failures handled?
-Retries defined in `global_config.yaml`.  
-Stack traces stored in SQLite for UI display.  
-Failed jobs remain in `processing/` with status `failed` until retried manually.
-
----
-
-### 6. How is data stored?
-- **Config Files:** Remain in `finished/` for reproducibility.
-- **Database:** Tracks metadata only—job type, config name, workflow ID, priority, status, retries, start/end times, duration, error trace, and optional metadata.
-
----
-
-### 7. What is the role of ComfyUI?
-The ComfyUI Agent runs against a single always-on ComfyUI instance.  
-Jobs are triggered via API using workflow IDs mapped to pre-saved templates.
-
----
-
-### 8. What can the UI do?
-View queue, completed jobs, failed jobs; change job priority/order; view error details; retry failed jobs; with safeguards to prevent DB corruption.
-
----
-
-### 9. What is the development approach?
-TDD-first, small testable functions, unit tests for all modules.
-
----
-
-### 10. What’s next for E3?
-Future phases will introduce config generation, placement, multi-agent orchestration, and cloud execution.
-
----
-
-## Example Config (YAML)
-
-```yaml
-job_type: T2I
-workflow_id: wf_realistic_portrait
-priority: 20
-inputs:
-  prompt: "Ultra-realistic portrait of a medieval knight in rain, cinematic lighting"
-  seed: 123456
-  steps: 30
-outputs:
-  file_path: "/finished/image/T2I_20250809123001_1_knight.png"
-metadata:
-  creator: "ComfyUI Agent"
-  version: "1.0"
-```
+### What’s next for E3?
+Config generation agents, placement/batching, multi-agent orchestration, combined workflows, and cloud execution backends.

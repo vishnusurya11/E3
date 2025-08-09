@@ -1,0 +1,20 @@
+# Sample 3D object generation job configuration
+job_type: 3D
+workflow_id: wf_3d_object
+priority: 60
+
+inputs:
+  prompt: "Detailed medieval sword with ornate handle, weathered blade showing battle damage, realistic metal textures"
+  resolution: "high"
+  format: "glb"
+  texture_quality: "4k"
+  polygon_count: 50000
+
+outputs:
+  file_path: "jobs/finished/3d/3D_20250809143400_1_object.glb"
+  
+metadata:
+  creator: "ComfyUI Agent Sample"
+  version: "1.0"
+  notes: "3D object generation test"
+  target_application: "game_asset"

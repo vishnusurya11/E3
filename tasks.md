@@ -9,7 +9,20 @@
 > 6) **Run all tests** again.  
 > 7) **Update docs** (docstrings and Markdown) and commit.
 
+## Project Context
+**E3 (Ember 3)** is a modular AI media generation system. Phase 1 implements the **ComfyUI Agent** - an execution engine that:
+- Monitors folders for YAML job configs
+- Maintains a SQLite priority queue
+- Executes jobs through ComfyUI API using pre-saved workflow templates
+- Provides a web UI for monitoring and control
+
+**Key Learnings from Legacy Code:**
+- ComfyUI communication via WebSocket + HTTP API (see `legacyfiles/comfyworkflowtrigger.py`)
+- Two-loop architecture: Monitor (filesystem→DB) and Executor (DB→ComfyUI)
+- Workflow templates are JSON files loaded and parameterized at runtime
+
 Conventions (pip/Python standards):
+- **Package Manager:** Use `uv` for all Python package management (requirement from docs)
 - **One function = one responsibility**; keep functions small and pure when possible.
 - **Docstrings** (Google/NumPy style) include: purpose, parameters, returns, raises, examples.
 - **Naming:** `snake_case` for functions/vars, `CamelCase` for classes. Tests: `test_<module>_<function>_<scenario>.py`.
@@ -19,16 +32,27 @@ Conventions (pip/Python standards):
 
 ---
 
-## 0) Repository Bootstrap & Scaffolding
+## 0) Repository Bootstrap & Scaffolding ✅
 
-- [ ] **Create folder tree**
-  - [ ] `comfyui_agent/{config,utils,tests}`
-  - [ ] `jobs/{processing/{image,video,audio,speech,3d},finished/{image,video,audio,speech,3d}}`
-  - [ ] `database`, `docs`, `workflows`
-- [ ] **Add toolchain**
-  - [ ] `pyproject.toml` or `setup.cfg` (black/isort/flake8/pytest configs)
-  - [ ] `requirements.txt` (fastapi/flask, uvicorn, pyyaml, watchdog, httpx/requests, pytest, coverage, typer/argparse)
-- [ ] **Initialize CI** (GitHub Actions or similar): run linters + `pytest -q` on PRs
+- [x] **Create folder tree**
+  - [x] `comfyui_agent/{config,utils,tests}` 
+  - [x] `jobs/{processing/{image,video,audio,speech,3d},finished/{image,video,audio,speech,3d}}`
+  - [x] `database`, `workflows`
+- [x] **Add toolchain**
+  - [x] `pyproject.toml` (black/isort/flake8/pytest configs)
+  - [x] `requirements.txt` with dependencies:
+    - Core: `pyyaml`, `watchdog`, `httpx`, `websocket-client`
+    - Web: `fastapi`, `uvicorn`, `jinja2`
+    - Database: `sqlalchemy` (or use stdlib sqlite3)
+    - Testing: `pytest`, `pytest-cov`, `pytest-asyncio`, `pytest-mock`
+    - Quality: `black`, `isort`, `flake8` (or `ruff`)
+    - CLI: `typer` or `click`
+  - [ ] `.env.example` for local development settings
+- [ ] **Initialize uv virtual environment**
+  - [ ] Install `uv` if not present
+  - [ ] Create venv: `uv venv`
+  - [ ] Install dependencies: `uv pip install -r requirements.txt`
+- [ ] **Initialize CI** (GitHub Actions): run linters + `pytest -q` on PRs
 
 ---
 
@@ -338,6 +362,84 @@ Conventions (pip/Python standards):
 - [ ] Update `docs/README_docs.md` index and links.
 - [ ] Add sample `workflows/*.json` placeholders and example YAML jobs.
 - [ ] Changelog entry and version bump.
+
+---
+
+## Implementation Timeline & Priority
+
+### Week 1: Foundation (High Priority)
+1. **Day 1-2:** Environment setup (Section 0)
+   - Set up uv, create folder structure, requirements.txt
+   - Initialize testing framework
+2. **Day 3-4:** Core utilities (Sections 1-3)
+   - Config loader with tests
+   - File utilities with tests
+   - Validation utilities with tests
+3. **Day 5:** Database layer basics (Section 4)
+   - Schema creation
+   - Basic CRUD operations
+
+### Week 2: Core Functionality (High Priority)
+1. **Day 1-2:** Complete database layer (Section 4)
+   - Leasing mechanism
+   - Recovery functions
+2. **Day 3-4:** ComfyUI integration (Section 5)
+   - Adapt legacy WebSocket/HTTP code
+   - Build payload and invoke functions
+3. **Day 5:** Monitor service (Section 7)
+   - Filesystem watcher
+   - YAML ingestion to DB
+
+### Week 3: Services & UI (Medium Priority)
+1. **Day 1-2:** Executor service (Section 8)
+   - Job execution loop
+   - Error handling and retries
+2. **Day 3-4:** Web UI backend (Section 10)
+   - FastAPI endpoints
+   - Queue management APIs
+3. **Day 5:** Web UI frontend (Section 11)
+   - Basic HTML/JS interface
+   - Auto-refresh functionality
+
+### Week 4: Polish & Testing (Medium Priority)
+1. **Day 1-2:** CLI tools (Section 12)
+   - Command-line interface for operations
+2. **Day 3:** End-to-end testing (Section 13)
+   - Integration with real ComfyUI
+   - Smoke tests
+3. **Day 4-5:** Hardening & documentation (Sections 14-15)
+   - Additional guardrails
+   - Complete documentation
+
+---
+
+## Key Implementation Notes from Legacy Analysis
+
+### ComfyUI Communication Pattern (from `comfyworkflowtrigger.py`)
+```python
+# Key components for ComfyUI integration:
+1. WebSocket connection for real-time updates: ws://{server}/ws?clientId={client_id}
+2. HTTP API for queuing prompts: POST http://{server}/prompt
+3. HTTP API for retrieving results: GET http://{server}/history/{prompt_id}
+4. Workflow JSON files loaded and modified at runtime
+5. Client ID tracking for session management
+```
+
+### Critical Features to Implement
+1. **File Validation**: Legacy code validates generated files exist on disk (reliability issue with ComfyUI)
+2. **Retry Logic**: Use same seeds for consistency when retrying failed generations
+3. **Leasing System**: Prevent duplicate job execution in concurrent scenarios
+4. **God Mode**: Priority override without interrupting current job
+
+### Database Schema Additions (beyond original PRD)
+```sql
+-- Additional fields learned from requirements:
+run_count INTEGER DEFAULT 0,        -- Track total execution attempts
+retries_attempted INTEGER DEFAULT 0, -- Current retry count
+retry_limit INTEGER DEFAULT 2,       -- Per-job or global limit
+worker_id TEXT,                      -- For leasing/ownership
+lease_expires_at TEXT,               -- ISO timestamp for lease expiry
+```
 
 ---
 
