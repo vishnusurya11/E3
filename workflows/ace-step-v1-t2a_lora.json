@@ -1,0 +1,193 @@
+{
+  "14": {
+    "inputs": {
+      "tags": "country rock, folk rock, southern rock, bluegrass, pop",
+      "lyrics": [
+        "74",
+        0
+      ],
+      "lyrics_strength": 0.9900000000000002,
+      "clip": [
+        "77",
+        1
+      ]
+    },
+    "class_type": "TextEncodeAceStepAudio",
+    "_meta": {
+      "title": "TextEncodeAceStepAudio"
+    }
+  },
+  "17": {
+    "inputs": {
+      "seconds": 153,
+      "batch_size": 1
+    },
+    "class_type": "EmptyAceStepLatentAudio",
+    "_meta": {
+      "title": "EmptyAceStepLatentAudio"
+    }
+  },
+  "18": {
+    "inputs": {
+      "samples": [
+        "52",
+        0
+      ],
+      "vae": [
+        "40",
+        2
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAEDecodeAudio"
+    }
+  },
+  "40": {
+    "inputs": {
+      "ckpt_name": "ace_step_v1_3.5b.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "44": {
+    "inputs": {
+      "conditioning": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "49": {
+    "inputs": {
+      "model": [
+        "51",
+        0
+      ],
+      "operation": [
+        "50",
+        0
+      ]
+    },
+    "class_type": "LatentApplyOperationCFG",
+    "_meta": {
+      "title": "LatentApplyOperationCFG"
+    }
+  },
+  "50": {
+    "inputs": {
+      "multiplier": 1.0000000000000002
+    },
+    "class_type": "LatentOperationTonemapReinhard",
+    "_meta": {
+      "title": "LatentOperationTonemapReinhard"
+    }
+  },
+  "51": {
+    "inputs": {
+      "shift": 5.000000000000001,
+      "model": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "52": {
+    "inputs": {
+      "seed": 480763227646777,
+      "steps": 50,
+      "cfg": 5,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "77",
+        0
+      ],
+      "positive": [
+        "14",
+        0
+      ],
+      "negative": [
+        "44",
+        0
+      ],
+      "latent_image": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "59": {
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "quality": "V0",
+      "audioUI": "",
+      "audio": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "SaveAudioMP3",
+    "_meta": {
+      "title": "Save Audio (MP3)"
+    }
+  },
+  "74": {
+    "inputs": {
+      "lyrics": "[verse]\nSunshine on the boulevard the beach is calling loud\nWaves are dancing golden sand under a cotton cloud\nElectric heartbeat pounding fast the tide is on our side\nCatch a wave and feel alive we’ll take it for a ride\n\n[verse]\nPalm trees swaying left to right they know where we belong\nFeel the rhythm of the night it keeps us moving strong\nSea spray kisses salty air we’re flying with the breeze\nChampagne states of mind we ride we do just as we please\n\n[chorus]\nWe’re riding waves of life together hand in hand\nWith every beat we chase the beat it’s our own wonderland\nFeel the music take you higher as the shorelines blur\nThis is our world our endless summer as we live and learn\n\n[bridge]\nMoonlight paints the ocean blue reflections in our eyes\nStars align to light our path we’re surfing through the skies\nEvery moment like a song we sing it loud and clear\nEvery day’s a new adventure with you always near\n\n[verse]\nNeon lights and city sounds they blend with ocean views\nWe’re unstoppable tonight no way that we can lose\nDreams are written in the sand they sparkle in the sun\nTogether we’re a masterpiece our story’s just begun\n\n[chorus]\nWe’re riding waves of life together hand in hand\nWith every beat we chase the beat it’s our own wonderland\nFeel the music take you higher as the shorelines blur\nThis is our world our endless summer as we live and learn",
+      "language": "English",
+      "threshold": 0.8
+    },
+    "class_type": "LyricsLangSwitch",
+    "_meta": {
+      "title": "ACE-Step Lyrics Language Switch"
+    }
+  },
+  "76": {
+    "inputs": {
+      "preview": "",
+      "source": [
+        "74",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview Any"
+    }
+  },
+  "77": {
+    "inputs": {
+      "lora_name": "audio\\ace_step\\ACE-StepACE-Step-v1-chinese-rap-LoRA.safetensors",
+      "strength_model": 1.1600000000000001,
+      "strength_clip": 1,
+      "model": [
+        "49",
+        0
+      ],
+      "clip": [
+        "40",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  }
+}

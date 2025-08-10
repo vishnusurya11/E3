@@ -55,3 +55,8 @@ wf_3d_scene:
   template_path: "workflows/wf_3d_scene.json"
   required_inputs: ["prompt", "complexity", "lighting"]
   description: "Complete 3D scene generation"
+
+ace-step-v1-t2a_lora:
+  template_path: "workflows/ace-step-v1-t2a_lora.json"
+  required_inputs: ["text"]
+  description: "ACE Step v1 Text-to-Audio with LoRA"

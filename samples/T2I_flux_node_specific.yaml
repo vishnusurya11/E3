@@ -1,0 +1,22 @@
+job_type: T2I
+workflow_id: T2I_flux1_krea
+priority: 30
+inputs:
+  # Node-specific inputs (nodeID_parameter format)
+  45_text: "Ultra-realistic portrait of a medieval knight in heavy rain, dramatic lighting, cinematic composition, 8k resolution, highly detailed armor with water droplets"
+  31_seed: 42
+  31_steps: 30
+  31_cfg: 7.5
+  27_width: 1024
+  27_height: 1024
+  
+  # Generic fallback (optional, for backward compatibility)
+  prompt: "Ultra-realistic portrait of a medieval knight in heavy rain"
+  
+outputs:
+  file_path: "jobs/finished/image/knight_portrait.png"
+  
+metadata:
+  creator: "ComfyUI Agent"
+  version: "1.0"
+  notes: "Test with node-specific input mapping"

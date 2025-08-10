@@ -2,6 +2,7 @@ job_type: T2I
 workflow_id: wf_realistic_portrait
 priority: 20
 inputs:
+  # For wf_realistic_portrait - using generic format since we don't know node IDs
   prompt: "professional portrait of a software engineer, modern office background, natural lighting"
   seed: 12345
   steps: 30

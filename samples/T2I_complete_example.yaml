@@ -1,0 +1,27 @@
+job_type: T2I
+workflow_id: T2I_flux1_krea
+priority: 30
+inputs:
+  # Node 45 - CLIP Text Encode (prompt)
+  45_text: "Ultra-realistic portrait of a medieval knight in heavy rain, dramatic lighting, cinematic composition, 8k resolution, highly detailed armor with water droplets"
+  
+  # Node 31 - KSampler settings
+  31_seed: 42
+  31_steps: 20
+  31_cfg: 1
+  31_sampler_name: "euler"
+  31_scheduler: "simple"
+  31_denoise: 1
+  
+  # Node 27 - Image dimensions
+  27_width: 1024
+  27_height: 1024
+  27_batch_size: 1
+  
+outputs:
+  file_path: "jobs/finished/image/knight_portrait.png"
+  
+metadata:
+  creator: "ComfyUI Agent"
+  version: "1.0" 
+  notes: "Complete example with all node-specific parameters"

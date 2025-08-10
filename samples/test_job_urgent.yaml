@@ -2,8 +2,12 @@ job_type: T2I
 workflow_id: T2I_flux1_krea
 priority: 1
 inputs:
-  prompt: "URGENT: red warning sign with exclamation mark, bold text saying PRIORITY"
-  seed: 999
+  45_text: "URGENT: red warning sign with exclamation mark, bold text saying PRIORITY"
+  31_seed: 999
+  31_steps: 20
+  31_cfg: 1
+  27_width: 1024
+  27_height: 1024
 outputs:
   file_path: "jobs/finished/image/urgent_priority.png"
 metadata:
