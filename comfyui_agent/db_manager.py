@@ -100,19 +100,47 @@ def init_db(db_path: str) -> None:
             )
         """)
         
-        # Create audiobook processing table with workflow-ordered columns
+        # Create normalized titles table (Master content catalog)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audiobook_processing (
-                -- Core Book Info
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                book_id TEXT NOT NULL,
-                book_title TEXT NOT NULL,
+            CREATE TABLE IF NOT EXISTS titles (
+                book_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
                 author TEXT,
-                narrated_by TEXT,
-                input_file TEXT NOT NULL,
-                narrator_audio TEXT,
+                genre TEXT,
+                language TEXT DEFAULT 'en',
+                publication_year INTEGER,
+                source_url TEXT,
+                input_file_path TEXT NOT NULL,
+                audiobook_complete BOOLEAN DEFAULT false,
+                audiobook_narrator_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                FOREIGN KEY (audiobook_narrator_id) REFERENCES narrators(narrator_id)
+            )
+        """)
+        
+        # Create narrators table (Voice talent profiles)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS narrators (
+                narrator_id TEXT PRIMARY KEY,
+                narrator_name TEXT NOT NULL,
+                voice_sample_path TEXT,
+                voice_model TEXT NOT NULL,
+                language TEXT DEFAULT 'en',
+                gender TEXT,
+                description TEXT,
+                active BOOLEAN DEFAULT true,
+                created_at TEXT NOT NULL
+            )
+        """)
+        
+        # Create audiobook production table (Workflow status tracking)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audiobook_production (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id TEXT NOT NULL,
+                narrator_id TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
                 
                 -- Step 1: Parse Novel
                 parse_novel_status TEXT DEFAULT 'pending',
@@ -161,7 +189,12 @@ def init_db(db_path: str) -> None:
                 -- Metadata & Control
                 metadata TEXT,
                 retry_count INTEGER DEFAULT 0,
-                max_retries INTEGER DEFAULT 3
+                max_retries INTEGER DEFAULT 3,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                
+                FOREIGN KEY (book_id) REFERENCES titles(book_id),
+                FOREIGN KEY (narrator_id) REFERENCES narrators(narrator_id)
             )
         """)
         
@@ -181,20 +214,57 @@ def init_db(db_path: str) -> None:
             ON comfyui_jobs(config_name)
         """)
         
-        # Create indices for audiobook processing performance
+        # Create indices for titles table performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_titles_audiobook_complete
+            ON titles(audiobook_complete)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_titles_genre
+            ON titles(genre)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_titles_author
+            ON titles(author)
+        """)
+        
+        # Create indices for narrators table performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_narrators_active
+            ON narrators(active)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_narrators_language
+            ON narrators(language)
+        """)
+        
+        # Create indices for audiobook production performance
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_audiobook_book_id
-            ON audiobook_processing(book_id)
+            ON audiobook_production(book_id)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_audiobook_narrator_id
+            ON audiobook_production(narrator_id)
         """)
         
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_audiobook_status
-            ON audiobook_processing(parse_novel_status, audio_generation_status, video_generation_status)
+            ON audiobook_production(status)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_audiobook_workflow_status
+            ON audiobook_production(parse_novel_status, audio_generation_status, video_generation_status)
         """)
         
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_audiobook_created
-            ON audiobook_processing(created_at)
+            ON audiobook_production(created_at)
         """)
 
 

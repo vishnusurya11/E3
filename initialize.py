@@ -42,9 +42,20 @@ def validate_database_schema(db_path: str) -> bool:
         'duration', 'error_trace', 'metadata', 'worker_id', 'lease_expires_at'
     }
     
-    expected_audiobook_columns = {
-        'id', 'book_id', 'book_title', 'author', 'narrated_by', 'input_file',
-        'narrator_audio', 'created_at', 'updated_at', 'parse_novel_status',
+    # Expected normalized table schemas
+    expected_titles_columns = {
+        'book_id', 'title', 'author', 'genre', 'language', 'publication_year',
+        'source_url', 'input_file_path', 'audiobook_complete', 'audiobook_narrator_id',
+        'created_at', 'updated_at'
+    }
+    
+    expected_narrators_columns = {
+        'narrator_id', 'narrator_name', 'voice_sample_path', 'voice_model',
+        'language', 'gender', 'description', 'active', 'created_at'
+    }
+    
+    expected_audiobook_production_columns = {
+        'id', 'book_id', 'narrator_id', 'status', 'parse_novel_status',
         'parse_novel_completed_at', 'metadata_status', 'metadata_completed_at',
         'total_chapters', 'total_chunks', 'total_words', 'audio_generation_status',
         'audio_generation_completed_at', 'audio_jobs_completed', 'total_audio_files',
@@ -58,7 +69,7 @@ def validate_database_schema(db_path: str) -> bool:
         'subtitle_generation_status', 'subtitle_generation_completed_at',
         'video_generation_status', 'video_generation_started_at',
         'video_generation_completed_at', 'total_videos_created', 'metadata',
-        'retry_count', 'max_retries'
+        'retry_count', 'max_retries', 'created_at', 'updated_at'
     }
     
     try:
@@ -80,20 +91,50 @@ def validate_database_schema(db_path: str) -> bool:
             
             print(f"✅ ComfyUI jobs table validated - {len(comfyui_columns)} columns present")
             
-            # Validate audiobook_processing table
-            cursor.execute("PRAGMA table_info(audiobook_processing)")
-            audiobook_columns = {row[1] for row in cursor.fetchall()}
+            # Validate titles table
+            cursor.execute("PRAGMA table_info(titles)")
+            titles_columns = {row[1] for row in cursor.fetchall()}
             
-            missing = expected_audiobook_columns - audiobook_columns
+            missing = expected_titles_columns - titles_columns
             if missing:
-                print(f"❌ Missing columns in audiobook_processing table: {missing}")
+                print(f"❌ Missing columns in titles table: {missing}")
                 return False
                 
-            extra = audiobook_columns - expected_audiobook_columns  
+            extra = titles_columns - expected_titles_columns
             if extra:
-                print(f"⚠️  Extra columns in audiobook_processing table: {extra}")
+                print(f"⚠️  Extra columns in titles table: {extra}")
+                
+            print(f"✅ Titles table validated - {len(titles_columns)} columns present")
             
-            print(f"✅ Audiobook processing table validated - {len(audiobook_columns)} columns present")
+            # Validate narrators table
+            cursor.execute("PRAGMA table_info(narrators)")
+            narrators_columns = {row[1] for row in cursor.fetchall()}
+            
+            missing = expected_narrators_columns - narrators_columns
+            if missing:
+                print(f"❌ Missing columns in narrators table: {missing}")
+                return False
+                
+            extra = narrators_columns - expected_narrators_columns
+            if extra:
+                print(f"⚠️  Extra columns in narrators table: {extra}")
+                
+            print(f"✅ Narrators table validated - {len(narrators_columns)} columns present")
+            
+            # Validate audiobook_production table
+            cursor.execute("PRAGMA table_info(audiobook_production)")
+            audiobook_columns = {row[1] for row in cursor.fetchall()}
+            
+            missing = expected_audiobook_production_columns - audiobook_columns
+            if missing:
+                print(f"❌ Missing columns in audiobook_production table: {missing}")
+                return False
+                
+            extra = audiobook_columns - expected_audiobook_production_columns  
+            if extra:
+                print(f"⚠️  Extra columns in audiobook_production table: {extra}")
+            
+            print(f"✅ Audiobook production table validated - {len(audiobook_columns)} columns present")
             
             # Check WAL mode
             cursor.execute("PRAGMA journal_mode")
