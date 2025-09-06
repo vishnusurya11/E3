@@ -295,6 +295,22 @@ def move_audio_files_for_book(book_dict: Dict) -> bool:
     book_id = book_dict['book_id']
     book_title = book_dict['book_title']
     
+    # CRITICAL SAFETY CHECK: Verify all audio jobs are actually completed
+    total_jobs = book_dict.get('total_audio_files', 0)
+    completed_jobs = book_dict.get('audio_jobs_completed', 0)
+    
+    print(f"🔍 SAFETY CHECK: Audio job completion validation")
+    print(f"  Expected jobs: {total_jobs}")
+    print(f"  Completed jobs: {completed_jobs}")
+    
+    if total_jobs > 0 and completed_jobs < total_jobs:
+        print(f"❌ SAFETY CHECK FAILED: Only {completed_jobs}/{total_jobs} jobs completed!")
+        print(f"❌ Cannot move files until ALL audio jobs are finished")
+        log_simple(book_id, f"Move blocked: {completed_jobs}/{total_jobs} jobs complete", 'ERROR', 'audio_move_blocked')
+        return False
+    
+    print(f"✅ SAFETY CHECK PASSED: All {completed_jobs} jobs completed")
+    
     # Source: dev/output/speech/{book_id}/
     source_dir = Path("D:/Projects/pheonix/dev/output/speech") / book_id
     
@@ -1392,7 +1408,8 @@ def main(input_dir, output_dir):
         success = generate_audio_jobs_for_book(selected_book, output_dir)
         
     elif (selected_book['audio_generation_status'] == 'completed' and 
-          selected_book.get('audio_files_moved_status', 'pending') != 'completed'):
+          selected_book.get('audio_files_moved_status', 'pending') != 'completed' and
+          selected_book.get('audio_jobs_completed', 0) >= selected_book.get('total_audio_files', 1)):
         ################################################################################
         # STEP 6: MOVE AUDIO FILES
         ################################################################################
