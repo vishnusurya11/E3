@@ -1,0 +1,5 @@
+book_id,book_title,author,narrator,cover_image,voice_sample,min_chunk_size,max_chunk_size,enabled
+pg98,A Tale of Two Cities,Charles Dickens,Rowan Whitmore,images/pg98_cover.jpg,D:\Projects\pheonix\prod\E3\E3\audio_samples\toireland_shelley_cf_128kb.mp3,400,500,no
+pg139,The Lost World,Sir Arthur Conan Doyle,Rowan Whitmore,images/pg139_cover.jpg,D:\Projects\pheonix\prod\E3\E3\audio_samples\toireland_shelley_cf_128kb.mp3,400,500,no
+pg5230,Pride and Prejudice,Jane Austen,Emma Thompson,images/pg5230_cover.jpg,D:\Projects\pheonix\prod\E3\E3\audio_samples\30000bequestandotherstories_32_twain.mp3,400,500,no
+pg174,The Picture of Dorian Gray,Oscar Wilde,Rowan Whitmore,images/pg325_cover.jpg,D:\Projects\pheonix\prod\E3\E3\audio_samples\toireland_shelley_cf_128kb.mp3,400,500,yes

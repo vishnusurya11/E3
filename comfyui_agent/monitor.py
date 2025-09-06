@@ -49,8 +49,8 @@ def process_yaml_file(yaml_path: str, workflows: Dict[str, Any],
         basename = os.path.basename(yaml_path)
         parsed = parse_config_name(basename)
         
-        # Load YAML content
-        with open(yaml_path, 'r') as f:
+        # Load YAML content with UTF-8 encoding to handle special characters
+        with open(yaml_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
         
         if not config:
@@ -130,10 +130,12 @@ def scan_once(cfg: Dict[str, Any], workflows: Dict[str, Any],
         "retry_limit": cfg.get("retry_limit", 2)
     }
     
-    # Process each file
+    # Process each file with delay to prevent overwhelming the system
     for yaml_path in yaml_files:
         result = process_yaml_file(yaml_path, workflows, db_path, defaults)
         results.append(result)
+        # Add 1 second delay after each file to allow sequential processing
+        time.sleep(1)
     
     if results:
         accepted = len([r for r in results if r["status"] == "accepted"])

@@ -205,11 +205,12 @@ def lease_next_job(db_path: str, worker_id: str, lease_seconds: int) -> Optional
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
         
-        # Select next pending job ordered by priority then ID
+        # Select next pending job ordered by priority then config_name (for sequential processing)
+        # This ensures s0001 is processed before s0002 for SPEECH jobs
         cursor.execute("""
             SELECT * FROM jobs
             WHERE status = 'pending'
-            ORDER BY priority ASC, id ASC
+            ORDER BY priority ASC, config_name ASC
             LIMIT 1
         """)
         
@@ -392,12 +393,12 @@ def list_jobs_by_status(db_path: str, status: Optional[str] = None) -> List[Dict
             cursor.execute("""
                 SELECT * FROM jobs
                 WHERE status = ?
-                ORDER BY priority ASC, id ASC
+                ORDER BY priority ASC, config_name ASC
             """, (status,))
         else:
             cursor.execute("""
                 SELECT * FROM jobs
-                ORDER BY priority ASC, id ASC
+                ORDER BY priority ASC, config_name ASC
             """)
         
         return [dict(row) for row in cursor.fetchall()]

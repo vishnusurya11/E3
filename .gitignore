@@ -1,4 +1,12 @@
 
+# Environment and API Keys
+.env
+.env.local
+.env.*.local
+*.key
+api_keys.txt
+secrets.json
+
 legacyfiles/
 .claude/
 jobs/
@@ -7,3 +15,14 @@ jobs/
 __py*
 *.db
 samples/*
+audio_samples/
+combined_audio/
+e3_comfyui_agent.egg-info/*
+input/
+*.json
+*.srt
+*.mp4
+archive*
+*.jpg
+audiobooks/*
+foundry/*

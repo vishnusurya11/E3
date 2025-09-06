@@ -18,8 +18,11 @@ VALID_JOB_TYPES = {"T2I", "T2V", "SPEECH", "AUDIO", "3D"}
 def parse_config_name(filename: str) -> Dict[str, Any]:
     """Parse and validate config filename format.
     
-    Expected format: TYPE_YYYYMMDDHHMMSS_X_jobname.yaml
-    where TYPE is one of the valid job types, X is an integer index.
+    Expected format: TYPE_IDENTIFIER_X_jobname.yaml
+    where:
+    - TYPE is one of the valid job types
+    - IDENTIFIER is either a 14-digit timestamp (YYYYMMDDHHMMSS) or alphanumeric string
+    - X is an integer index
     
     Args:
         filename: Config filename (with or without path).
@@ -27,7 +30,7 @@ def parse_config_name(filename: str) -> Dict[str, Any]:
     Returns:
         Dictionary with parsed components:
         - job_type: The job type (T2I, T2V, etc.)
-        - timestamp: Timestamp string (YYYYMMDDHHMMSS)
+        - timestamp: Timestamp string (YYYYMMDDHHMMSS) or identifier (alphanumeric)
         - index: Integer index
         - jobname: Job name string
         
@@ -64,9 +67,12 @@ def parse_config_name(filename: str) -> Dict[str, Any]:
     if job_type not in VALID_JOB_TYPES:
         raise ValueError(f"Invalid job type: {job_type}. Must be one of {VALID_JOB_TYPES}")
     
-    # Validate timestamp format (must be exactly 14 digits)
-    if len(timestamp_str) != 14 or not timestamp_str.isdigit():
-        raise ValueError(f"Invalid timestamp: {timestamp_str}")
+    # Validate timestamp OR identifier format
+    # Accept either 14-digit timestamp or alphanumeric identifier
+    if not (len(timestamp_str) == 14 and timestamp_str.isdigit()):
+        # Also accept alphanumeric identifiers (e.g., pg159, book123, etc.)
+        if not re.match(r'^[a-zA-Z0-9]+$', timestamp_str):
+            raise ValueError(f"Invalid timestamp/identifier: {timestamp_str}")
     
     # Parse index
     try:

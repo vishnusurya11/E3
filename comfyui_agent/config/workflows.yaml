@@ -60,3 +60,13 @@ ace-step-v1-t2a_lora:
   template_path: "workflows/ace-step-v1-t2a_lora.json"
   required_inputs: ["text"]
   description: "ACE Step v1 Text-to-Audio with LoRA"
+
+T2S_chatterbox_v1:
+  template_path: "workflows/Text2Speech/T2S_chatterbox_v1.json"
+  required_inputs: ["text"]
+  description: "T2S_chatterbox_v1"
+
+image_qwen_image:
+  template_path: "workflows/image_qwen_image.json"
+  required_inputs: ["6_text"]
+  description: "Image generation for audiobook thumbnails using Qwen model"

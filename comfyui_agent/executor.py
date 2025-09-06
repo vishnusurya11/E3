@@ -23,6 +23,7 @@ from comfyui_agent.db_manager import (
     get_job_by_config_name
 )
 from comfyui_agent.utils.file_utils import safe_move
+import shutil
 from comfyui_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -160,9 +161,9 @@ def build_payload(workflow_id: str, inputs: Dict[str, Any],
         base_dir = Path(__file__).parent.parent
         template_path = base_dir / template_path
     
-    # Load template
+    # Load template with UTF-8 encoding
     try:
-        with open(template_path, 'r') as f:
+        with open(template_path, 'r', encoding='utf-8') as f:
             workflow_template = json.load(f)
     except FileNotFoundError:
         raise ValueError(f"Template not found: {template_path}")
@@ -335,10 +336,18 @@ def execute_job(job: Dict[str, Any], cfg: Dict[str, Any],
             logger.info(f"[EXECUTE] Checking uppercase folder: {yaml_path}")
         
         if not os.path.exists(yaml_path):
-            raise FileNotFoundError(f"YAML file not found in any expected location: {config_name}")
+            # Check if file exists in finished folder (might be a retry of completed job)
+            finished_path = os.path.join(cfg["paths"]["jobs_finished"],
+                                        config_name.split("_")[0].lower(), config_name)
+            if os.path.exists(finished_path):
+                logger.warning(f"[EXECUTE] YAML found in finished folder, likely a retry: {finished_path}")
+                yaml_path = finished_path
+            else:
+                logger.error(f"[EXECUTE] YAML not found in processing or finished: {config_name}")
+                raise FileNotFoundError(f"YAML file not found in any expected location: {config_name}")
         
         logger.info(f"[EXECUTE] Found YAML at: {yaml_path}")
-        with open(yaml_path, 'r') as f:
+        with open(yaml_path, 'r', encoding='utf-8') as f:
             job_config = yaml.safe_load(f)
         logger.info(f"[EXECUTE] Loaded job config: {list(job_config.keys())}")
         
@@ -370,16 +379,22 @@ def execute_job(job: Dict[str, Any], cfg: Dict[str, Any],
         })
         
         # Move YAML to finished, preserving subfolder structure
-        # Get relative path from processing folder
-        processing_base = cfg["paths"]["jobs_processing"]
-        relative_path = os.path.relpath(yaml_path, processing_base)
-        
-        # Build finished path with same subfolder structure
-        finished_path = os.path.join(cfg["paths"]["jobs_finished"], relative_path)
-        finished_dir = os.path.dirname(finished_path)
-        os.makedirs(finished_dir, exist_ok=True)
-        
-        safe_move(yaml_path, finished_path)
+        # Only move if the file still exists (might have been moved by previous attempt)
+        if os.path.exists(yaml_path):
+            # Get relative path from processing folder
+            processing_base = cfg["paths"]["jobs_processing"]
+            relative_path = os.path.relpath(yaml_path, processing_base)
+            
+            # Build finished path with same subfolder structure
+            finished_path = os.path.join(cfg["paths"]["jobs_finished"], relative_path)
+            finished_dir = os.path.dirname(finished_path)
+            os.makedirs(finished_dir, exist_ok=True)
+            
+            # Move file after successful completion
+            shutil.move(yaml_path, finished_path)
+            logger.info(f"[EXECUTE] Moved YAML to finished: {finished_path}")
+        else:
+            logger.info(f"[EXECUTE] YAML already moved or doesn't exist: {yaml_path}")
         
         logger.info(f"[EXECUTE] ✅ Job {config_name} completed successfully!")
         

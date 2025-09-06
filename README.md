@@ -5,6 +5,7 @@ Monitors folders for YAML configs → Queues in SQLite → Executes via ComfyUI 
 ## Prerequisites
 - Python 3.9+
 - ComfyUI running at http://127.0.0.1:8000
+- Web ui  running at http://127.0.0.1:8080
 - uv package manager: `pip install uv`
 
 ## Windows Setup (Command Prompt)
@@ -90,6 +91,201 @@ Open http://localhost:8080 to:
 - See completed/failed jobs
 - Retry failed jobs
 - Adjust priorities
+
+## Database Management
+
+### Adding New Books to Audiobook Pipeline
+
+To add a new book to the audiobook processing pipeline, use this SQL template:
+
+```sql
+INSERT INTO audiobook_processing (
+    book_id, book_title, author, narrated_by, input_file, narrator_audio,
+    created_at, updated_at
+) VALUES (
+    'pg12345',                    -- Unique book ID (usually Project Gutenberg ID)
+    'The Book Title',             -- Full title of the book
+    'Author Name',                -- Author's name
+    'Narrator Name',              -- Name of the narrator
+    'foundry/input/pg12345.html', -- Path to input file (must exist)
+    'D:\Projects\pheonix\prod\E3\E3\audio_samples\voice_sample.mp3', -- Voice sample path
+    datetime('now'),              -- Creation timestamp
+    datetime('now')               -- Update timestamp
+);
+```
+
+### Field Requirements
+
+**Required Fields:**
+- `book_id`: Unique identifier (e.g., "pg12345" for Project Gutenberg book 12345)
+- `book_title`: Complete title of the book
+- `input_file`: Path to the source file (HTML, TXT, etc.) - **file must exist**
+- `created_at`: Timestamp (use `datetime('now')`)
+- `updated_at`: Timestamp (use `datetime('now')`)
+
+**Optional but Recommended:**
+- `author`: Author's full name
+- `narrated_by`: Narrator's name for TTS
+- `narrator_audio`: Path to voice sample file for TTS generation
+
+### Usage Example
+
+```bash
+# Connect to database and add a book
+python3 -c "
+import sqlite3
+conn = sqlite3.connect('database/audiobook.db')
+cursor = conn.cursor()
+cursor.execute('''
+    INSERT INTO audiobook_processing (
+        book_id, book_title, author, narrated_by, input_file, narrator_audio,
+        created_at, updated_at
+    ) VALUES (
+        'pg11870',
+        'The Country of the Blind, and Other Stories',
+        'H. G. WELLS',
+        'Rowan Whitmore',
+        'foundry/input/pg11870.html',
+        'D:\\Projects\\pheonix\\prod\\E3\\E3\\audio_samples\\toireland_shelley_cf_128kb.mp3',
+        datetime('now'),
+        datetime('now')
+    )
+''')
+conn.commit()
+conn.close()
+print('Book added successfully!')
+"
+```
+
+### Prerequisites
+1. Input file must exist at the specified path
+2. Voice sample file should exist for TTS generation
+3. Ensure `foundry/input/` directory exists
+4. Book ID should be unique in the database
+
+## Development Environment Setup (Windows)
+
+### Setting Up a Separate Dev Environment
+
+To experiment safely without affecting your production setup:
+
+#### 1. Install Prerequisites (Windows)
+```cmd
+# Install Python 3.9+ from python.org if not already installed
+python --version
+
+# Install uv package manager
+pip install uv
+```
+
+#### 2. Clone to Dev Directory
+```cmd
+# Navigate to your desired dev location
+cd D:\Projects\pheonix\dev
+
+# Clone the entire project
+git clone D:\Projects\pheonix\prod\E3\E3 E3-dev
+# OR copy if not using git
+xcopy D:\Projects\pheonix\prod\E3\E3 E3-dev /E /I /H
+
+cd E3-dev
+```
+
+#### 3. Create Fresh Virtual Environment
+```cmd
+# Remove any existing venv
+if exist .venv rmdir /s /q .venv
+
+# Create new virtual environment
+uv venv
+
+# Activate virtual environment
+.venv\Scripts\activate
+
+# Install all dependencies
+uv pip install -r requirements.txt
+
+# Install package in development mode
+uv pip install -e .
+```
+
+#### 4. Initialize Dev Databases
+```cmd
+# Create database directory if it doesn't exist
+if not exist database mkdir database
+
+# Initialize ComfyUI database
+python -c "from comfyui_agent.db_manager import init_db; init_db('database/comfyui_agent.db')"
+
+# Copy production audiobook database (optional - for testing with existing data)
+copy D:\Projects\pheonix\prod\E3\E3\database\audiobook.db database\audiobook.db
+
+# OR create fresh audiobook database - this will be created automatically when you run the pipeline
+```
+
+#### 5. Create Required Directories
+```cmd
+# Create essential directories
+if not exist foundry\input mkdir foundry\input
+if not exist foundry\processing mkdir foundry\processing
+if not exist foundry\finished mkdir foundry\finished
+if not exist jobs\processing\speech mkdir jobs\processing\speech
+if not exist jobs\processing\image mkdir jobs\processing\image
+if not exist jobs\finished\speech mkdir jobs\finished\speech
+if not exist jobs\finished\image mkdir jobs\finished\image
+if not exist audio_samples mkdir audio_samples
+```
+
+#### 6. Environment Configuration
+```cmd
+# Copy sample environment file if it exists
+if exist .env.example copy .env.example .env
+
+# Edit .env file with your settings:
+# - API keys
+# - ComfyUI endpoint
+# - Audio sample paths
+```
+
+#### 7. Test Your Dev Environment
+```cmd
+# Verify virtual environment is active (should show .venv in prompt)
+where python
+# Should point to: D:\Projects\pheonix\dev\E3-dev\.venv\Scripts\python.exe
+
+# Test ComfyUI agent
+python -m comfyui_agent.cli --help
+
+# Test audiobook pipeline
+python generate_audiobook.py
+```
+
+#### 8. Dev vs Prod Differences
+Your dev environment is now completely separate:
+- **Dev Path**: `D:\Projects\pheonix\dev\E3-dev\`
+- **Prod Path**: `D:\Projects\pheonix\prod\E3\E3\`
+- **Separate databases**: No risk of corrupting prod data
+- **Separate virtual environments**: Independent package versions
+- **Separate logs and outputs**: Easy to distinguish dev vs prod
+
+#### 9. Keeping Dev Updated
+```cmd
+# To sync changes from prod to dev:
+cd D:\Projects\pheonix\dev\E3-dev
+
+# Copy specific files you want to update
+copy D:\Projects\pheonix\prod\E3\E3\generate_audiobook.py .
+copy D:\Projects\pheonix\prod\E3\E3\requirements.txt .
+
+# Or sync entire directories (be careful with databases)
+robocopy D:\Projects\pheonix\prod\E3\E3\comfyui_agent comfyui_agent /E
+```
+
+### Prerequisites
+1. Input file must exist at the specified path
+2. Voice sample file should exist for TTS generation
+3. Ensure `foundry/input/` directory exists
+4. Book ID should be unique in the database
 
 ## Troubleshooting
 

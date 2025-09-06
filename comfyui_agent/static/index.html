@@ -3,8 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ComfyUI Agent Dashboard</title>
+    <title>E3 ComfyUI Agent - Professional Dashboard</title>
+    
+    <!-- AG-Grid CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-quartz.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Monaco Editor for SQL -->
+    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.main.css">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
     <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-dark: #5b21b6;
+            --secondary: #ec4899;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --darker: #0f172a;
+            --light: #f1f5f9;
+            --white: #ffffff;
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -12,454 +39,1538 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
             min-height: 100vh;
-            padding: 20px;
+            color: var(--white);
         }
         
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        h1 {
-            color: white;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 10px;
+            max-width: 100%;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
         }
         
-        .stat-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .stat-label {
-            color: #666;
-            margin-top: 5px;
-        }
-        
-        .tabs {
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .tab {
-            background: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-        
-        .tab.active {
-            background: #667eea;
-            color: white;
-        }
-        
-        .job-list {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        .job-item {
-            display: grid;
-            grid-template-columns: 1fr 150px 150px 100px 200px;
-            gap: 15px;
-            padding: 15px;
-            border-bottom: 1px solid #eee;
+            justify-content: space-between;
             align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
-        .job-item:last-child {
-            border-bottom: none;
-        }
-        
-        .job-name {
-            font-weight: 500;
-            word-break: break-all;
-        }
-        
-        .status {
-            padding: 5px 10px;
-            border-radius: 5px;
-            text-align: center;
-            font-weight: 500;
-        }
-        
-        .status.pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        
-        .status.processing {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        
-        .status.done {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
-        .status.failed {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        
-        .priority {
-            text-align: center;
-            font-weight: 500;
-        }
-        
-        .actions {
+        .logo {
             display: flex;
-            gap: 5px;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
         }
         
         .btn {
-            padding: 5px 10px;
+            padding: 10px 20px;
+            border-radius: 8px;
             border: none;
-            border-radius: 5px;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .btn-primary {
-            background: #667eea;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
         }
         
-        .btn-primary:hover {
-            background: #5a67d8;
+        .btn-success {
+            background: var(--success);
+            color: white;
         }
         
         .btn-danger {
-            background: #ef4444;
+            background: var(--danger);
             color: white;
         }
         
-        .btn-danger:hover {
-            background: #dc2626;
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
         }
         
-        .btn-warning {
-            background: #f59e0b;
+        /* Tabs */
+        .tabs {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 8px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
             color: white;
         }
         
-        .btn-warning:hover {
-            background: #d97706;
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
         }
         
-        .error-trace {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            font-family: monospace;
-            font-size: 12px;
+        .tab-content {
             display: none;
         }
         
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #999;
+        .tab-content.active {
+            display: block;
         }
         
-        .modal {
-            display: none;
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(124, 58, 237, 0.3);
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .chart-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            height: 400px; /* Fixed height to prevent expansion */
+            overflow: hidden; /* Prevent content overflow */
+        }
+        
+        .chart-card canvas {
+            max-width: 100% !important;
+            max-height: 320px !important; /* Limit canvas height */
+        }
+        
+        /* AG-Grid Container */
+        .grid-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 24px;
+        }
+        
+        .grid-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .grid-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        #jobsGrid {
+            height: 600px;
+        }
+        
+        /* SQL Editor */
+        .sql-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sql-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        #sqlEditor {
+            height: 300px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .sql-results {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow: auto;
+        }
+        
+        /* Status colors */
+        .status-pending { color: var(--warning); }
+        .status-processing { color: #60a5fa; }
+        .status-completed { color: var(--success); }
+        .status-done { color: var(--success); }
+        .status-failed { color: var(--danger); }
+        .status-cancelled { color: #6b7280; }
+        
+        /* Loading overlay */
+        .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            align-items: center;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
             justify-content: center;
+            align-items: center;
+            z-index: 9999;
         }
         
-        .modal.show {
+        .loading-overlay.active {
             display: flex;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Custom AG-Grid styles */
+        .ag-theme-quartz-dark {
+            --ag-background-color: transparent;
+            --ag-foreground-color: var(--white);
+            --ag-header-background-color: rgba(124, 58, 237, 0.1);
+            --ag-header-foreground-color: var(--white);
+            --ag-border-color: rgba(255, 255, 255, 0.1);
+            --ag-row-hover-color: rgba(124, 58, 237, 0.1);
+            --ag-selected-row-background-color: rgba(124, 58, 237, 0.2);
+        }
+        
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .notification.show {
+            display: flex;
+        }
+        
+        .notification.success {
+            background: var(--success);
+        }
+        
+        .notification.error {
+            background: var(--danger);
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Audiobooks Dashboard Styles */
+        .audiobooks-container {
+            padding: 20px;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        
+        .audiobooks-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .audiobooks-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .audiobooks-grid-container {
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+        }
+        
+        #audiobooksGrid {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .pipeline-progress {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        
+        .step-indicator {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .step-completed { background: var(--success); color: white; }
+        .step-processing { background: var(--warning); color: white; }
+        .step-failed { background: var(--danger); color: white; }
+        .step-pending { background: rgba(255,255,255,0.2); color: var(--light); }
+        
+        .pipeline-steps {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .pipeline-step.completed { border-left-color: var(--success); }
+        .pipeline-step.processing { border-left-color: var(--warning); }
+        .pipeline-step.failed { border-left-color: var(--danger); }
+        
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
         }
         
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            max-width: 400px;
-            width: 100%;
+            background: var(--dark);
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         
-        .modal-title {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        
-        .modal-actions {
+        .modal-header {
             display: flex;
-            gap: 10px;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: white;
         }
     </style>
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+    
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notificationText"></span>
+    </div>
+    
     <div class="container">
-        <h1>ComfyUI Agent Dashboard</h1>
-        
-        <div class="stats" id="stats">
-            <div class="stat-card">
-                <div class="stat-value" id="stat-total">0</div>
-                <div class="stat-label">Total Jobs</div>
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-robot fa-2x" style="color: var(--primary)"></i>
+                <h1>E3 ComfyUI Agent</h1>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-pending">0</div>
-                <div class="stat-label">Pending</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-processing">0</div>
-                <div class="stat-label">Processing</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-done">0</div>
-                <div class="stat-label">Completed</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-failed">0</div>
-                <div class="stat-label">Failed</div>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="refreshData()">
+                    <i class="fas fa-sync"></i> Refresh
+                </button>
+                <button class="btn btn-success" onclick="exportData()">
+                    <i class="fas fa-download"></i> Export
+                </button>
             </div>
         </div>
         
+        <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" data-status="">All Jobs</button>
-            <button class="tab" data-status="pending">Pending</button>
-            <button class="tab" data-status="processing">Processing</button>
-            <button class="tab" data-status="done">Completed</button>
-            <button class="tab" data-status="failed">Failed</button>
+            <button class="tab-btn active" onclick="switchTab('overview')">
+                <i class="fas fa-chart-line"></i> Overview
+            </button>
+            <button class="tab-btn" onclick="switchTab('grid')">
+                <i class="fas fa-table"></i> Data Grid
+            </button>
+            <button class="tab-btn" onclick="switchTab('audiobooks')">
+                <i class="fas fa-book-open"></i> Audiobooks
+            </button>
+            <button class="tab-btn" onclick="switchTab('sql')">
+                <i class="fas fa-database"></i> SQL Console
+            </button>
         </div>
         
-        <div class="job-list" id="job-list">
-            <div class="loading">Loading jobs...</div>
+        <!-- Overview Tab -->
+        <div id="overviewTab" class="tab-content active">
+            <!-- ComfyUI Jobs Stats -->
+            <h3 style="margin-bottom: 15px;"><i class="fas fa-cogs"></i> ComfyUI Jobs</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value status-pending" id="statPending">0</div>
+                    <div class="stat-label">Pending Jobs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value status-processing" id="statProcessing">0</div>
+                    <div class="stat-label">Processing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value status-completed" id="statCompleted">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value status-failed" id="statFailed">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+            </div>
+            
+            <!-- Audiobook Pipeline Stats -->
+            <h3 style="margin: 30px 0 15px 0;"><i class="fas fa-book-open"></i> Audiobook Pipeline</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="statTotalBooks" style="color: var(--primary);">0</div>
+                    <div class="stat-label">Total Books</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value status-completed" id="statBooksCompleted">0</div>
+                    <div class="stat-label">Books Completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value status-processing" id="statBooksProcessing">0</div>
+                    <div class="stat-label">Books Processing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value status-failed" id="statBooksFailed">0</div>
+                    <div class="stat-label">Books Failed</div>
+                </div>
+            </div>
+            
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3 style="margin-bottom: 16px;">ComfyUI Jobs Distribution</h3>
+                    <canvas id="distributionChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3 style="margin-bottom: 16px;">Processing Timeline</h3>
+                    <canvas id="timelineChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3 style="margin-bottom: 16px;">Audiobook Pipeline Stages</h3>
+                    <canvas id="pipelineChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Grid Tab -->
+        <div id="gridTab" class="tab-content">
+            <div class="grid-container">
+                <div class="grid-header">
+                    <h3>Job Management</h3>
+                    <div class="grid-actions">
+                        <button class="btn btn-primary btn-sm" onclick="addNewJob()">
+                            <i class="fas fa-plus"></i> Add Job
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
+                            <i class="fas fa-trash"></i> Delete Selected
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="retrySelected()">
+                            <i class="fas fa-redo"></i> Retry Selected
+                        </button>
+                    </div>
+                </div>
+                <div id="jobsGrid" class="ag-theme-quartz-dark"></div>
+            </div>
+        </div>
+        
+        <!-- Audiobooks Dashboard Tab -->
+        <div id="audiobooksTab" class="tab-content">
+            <div class="audiobooks-container">
+                <div class="audiobooks-header">
+                    <h3>📚 Audiobook Pipeline Dashboard</h3>
+                    <div style="color: red; font-size: 14px; margin: 10px 0;">
+                        🧪 DEBUG: Audiobooks tab is visible and loading...
+                    </div>
+                    <div class="audiobooks-controls">
+                        <button onclick="refreshAudiobooks()" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                        <div class="filter-controls">
+                            <select id="statusFilter" onchange="filterAudiobooks()" style="padding: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                                <option value="">All Status</option>
+                                <option value="completed">✅ Completed</option>
+                                <option value="processing">🔄 Processing</option>
+                                <option value="failed">❌ Failed</option>
+                                <option value="pending">⚪ Pending</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="audiobooks-grid-container">
+                    <div id="audiobooksStatus" style="color: yellow; padding: 20px; text-align: center;">
+                        🔄 Loading audiobooks data...
+                    </div>
+                    
+                    <!-- Simple fallback table if AG-Grid fails -->
+                    <div id="audiobooksSimpleTable" style="display: none;">
+                        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                            <thead>
+                                <tr style="background: rgba(255,255,255,0.1);">
+                                    <th style="padding: 12px; text-align: left; border: 1px solid rgba(255,255,255,0.2);">ID</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid rgba(255,255,255,0.2);">Title</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid rgba(255,255,255,0.2);">Author</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid rgba(255,255,255,0.2);">Progress</th>
+                                    <th style="padding: 12px; text-align: left; border: 1px solid rgba(255,255,255,0.2);">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audiobooksTableBody">
+                                <tr>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">pg98</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">A Tale of Two Cities</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">Charles Dickens</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">80%</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">🔄 Combining audio</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">pg1155</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">The Secret Adversary</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">Agatha Christie</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">90%</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">✅ Prompts generated</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">pg61262</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">Poirot Investigates</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">Agatha Christie</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">70%</td>
+                                    <td style="padding: 12px; border: 1px solid rgba(255,255,255,0.2);">🔄 Processing audio</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="audiobooksGrid" class="ag-theme-quartz-dark" style="display: none;"></div>
+                </div>
+                
+                <!-- Book Detail Modal -->
+                <div id="bookDetailModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="modalBookTitle">Book Details</h3>
+                            <span class="close" onclick="closeBookModal()">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <div id="pipelineSteps" class="pipeline-steps"></div>
+                            <div id="bookMetadata" class="book-metadata"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SQL Console Tab -->
+        <div id="sqlTab" class="tab-content">
+            <div class="sql-container">
+                <div class="sql-header">
+                    <h3>SQL Console</h3>
+                    <div>
+                        <select id="sqlTemplates" onchange="loadSQLTemplate()" style="padding: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                            <option value="">-- Select Template --</option>
+                            <option value="SELECT * FROM jobs LIMIT 100">View Jobs (Limit 100)</option>
+                            <option value="SELECT status, COUNT(*) as count FROM jobs GROUP BY status">Count by Status</option>
+                            <option value="SELECT * FROM jobs WHERE status = 'failed'">Failed Jobs</option>
+                            <option value="SELECT * FROM jobs WHERE status = 'pending' ORDER BY priority ASC">Pending by Priority</option>
+                            <option value="UPDATE jobs SET status = 'pending' WHERE status = 'failed'">Retry Failed Jobs</option>
+                            <option value="DELETE FROM jobs WHERE status = 'cancelled'">Delete Cancelled</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="executeSQL()">
+                            <i class="fas fa-play"></i> Execute
+                        </button>
+                    </div>
+                </div>
+                <div id="sqlEditor"></div>
+                <div class="sql-results" id="sqlResults">
+                    <p style="color: rgba(255,255,255,0.5);">Query results will appear here...</p>
+                </div>
+            </div>
         </div>
     </div>
     
-    <div class="modal" id="priority-modal">
-        <div class="modal-content">
-            <h2 class="modal-title">Update Priority</h2>
-            <div class="form-group">
-                <label class="form-label">New Priority (1-999, lower = higher priority)</label>
-                <input type="number" class="form-input" id="priority-input" min="1" max="999" value="50">
-            </div>
-            <div class="modal-actions">
-                <button class="btn" onclick="closePriorityModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="savePriority()">Save</button>
-            </div>
-        </div>
-    </div>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     
     <script>
-        let currentStatus = '';
-        let selectedJob = null;
-        let autoRefresh = true;
+        // Global variables
+        let gridApi;
+        let jobsData = [];
+        let sqlEditor;
+        let distributionChart;
+        let timelineChart;
+        let pipelineChart;
         
-        async function fetchStats() {
-            try {
-                const response = await fetch('/api/stats');
-                const stats = await response.json();
-                
-                document.getElementById('stat-total').textContent = stats.total_jobs || 0;
-                document.getElementById('stat-pending').textContent = stats.by_status?.pending || 0;
-                document.getElementById('stat-processing').textContent = stats.by_status?.processing || 0;
-                document.getElementById('stat-done').textContent = stats.by_status?.done || 0;
-                document.getElementById('stat-failed').textContent = stats.by_status?.failed || 0;
-            } catch (error) {
-                console.error('Error fetching stats:', error);
-            }
-        }
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            initGrid();
+            initSQLEditor();
+            refreshData();
+            // Auto-refresh every 5 seconds
+            setInterval(refreshData, 5000);
+        });
         
-        async function fetchJobs(status = '') {
-            try {
-                const url = status ? `/api/queue?status=${status}` : '/api/queue';
-                const response = await fetch(url);
-                const jobs = await response.json();
-                
-                renderJobs(jobs);
-            } catch (error) {
-                console.error('Error fetching jobs:', error);
-                document.getElementById('job-list').innerHTML = '<div class="loading">Error loading jobs</div>';
-            }
-        }
-        
-        function renderJobs(jobs) {
-            const container = document.getElementById('job-list');
+        // Initialize Charts
+        function initCharts() {
+            // Distribution Chart
+            const ctx1 = document.getElementById('distributionChart').getContext('2d');
+            distributionChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Processing', 'Completed', 'Failed'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: [
+                            '#f59e0b',
+                            '#60a5fa',
+                            '#10b981',
+                            '#ef4444'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: 'white' }
+                        }
+                    }
+                }
+            });
             
-            if (jobs.length === 0) {
-                container.innerHTML = '<div class="loading">No jobs found</div>';
+            // Timeline Chart with error handling
+            try {
+                const timelineCanvas = document.getElementById('timelineChart');
+                if (!timelineCanvas) {
+                    console.error('❌ Timeline chart canvas not found');
+                    return;
+                }
+                
+                const ctx2 = timelineCanvas.getContext('2d');
+                timelineChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Jobs Completed',
+                        data: [],
+                        borderColor: '#7c3aed',
+                        backgroundColor: 'rgba(124, 58, 237, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: 'white' }
+                        }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error('❌ Timeline chart creation failed:', error);
+                timelineChart = null;
+            }
+            
+            // Pipeline Chart with error handling
+            try {
+                const pipelineCanvas = document.getElementById('pipelineChart');
+                if (!pipelineCanvas) {
+                    console.error('❌ Pipeline chart canvas not found');
+                    return;
+                }
+                
+                const ctx3 = pipelineCanvas.getContext('2d');
+                pipelineChart = new Chart(ctx3, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Parse', 'Metadata', 'TTS Jobs', 'Audio Check', 'Move Files', 'Plan Combo', 'Subtitles', 'Combine Audio', 'Image Prompts', 'Image Jobs', 'Generate Images', 'Completed'],
+                        datasets: [{
+                            label: 'Books in Stage',
+                            data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                            backgroundColor: [
+                                '#ef4444', '#f59e0b', '#eab308', '#84cc16', 
+                                '#22c55e', '#10b981', '#06b6d4', '#3b82f6',
+                                '#6366f1', '#8b5cf6', '#a855f7', '#10b981'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { 
+                                    color: 'white',
+                                    stepSize: 1
+                                },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            x: {
+                                ticks: { 
+                                    color: 'white',
+                                    maxRotation: 45
+                                },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                labels: { color: 'white' }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Pipeline chart creation failed:', error);
+                pipelineChart = null;
+            }
+        }
+        
+        // Initialize AG-Grid
+        function initGrid() {
+            const columnDefs = [
+                {
+                    headerCheckboxSelection: true,
+                    checkboxSelection: true,
+                    width: 50
+                },
+                { field: 'id', headerName: 'ID', width: 80, editable: false },
+                { field: 'config_name', headerName: 'Config Name', width: 250, editable: true },
+                { field: 'job_type', headerName: 'Type', width: 100, editable: true },
+                { field: 'workflow_id', headerName: 'Workflow', width: 150, editable: true },
+                { field: 'priority', headerName: 'Priority', width: 100, editable: true },
+                {
+                    field: 'status',
+                    headerName: 'Status',
+                    width: 120,
+                    editable: true,
+                    cellEditor: 'agSelectCellEditor',
+                    cellEditorParams: {
+                        values: ['pending', 'processing', 'completed', 'done', 'failed', 'cancelled']
+                    },
+                    cellStyle: params => {
+                        const colors = {
+                            pending: '#f59e0b',
+                            processing: '#60a5fa',
+                            completed: '#10b981',
+                            done: '#10b981',
+                            failed: '#ef4444',
+                            cancelled: '#6b7280'
+                        };
+                        return { color: colors[params.value] || 'white' };
+                    }
+                },
+                { field: 'retries_attempted', headerName: 'Retries', width: 100, editable: true },
+                { field: 'retry_limit', headerName: 'Limit', width: 80, editable: true },
+                { field: 'start_time', headerName: 'Start Time', width: 180, editable: false },
+                { field: 'end_time', headerName: 'End Time', width: 180, editable: false },
+                { field: 'duration', headerName: 'Duration', width: 100, editable: false },
+                { field: 'worker_id', headerName: 'Worker', width: 120, editable: false },
+                { field: 'error_trace', headerName: 'Error', width: 300, editable: true }
+            ];
+            
+            const gridOptions = {
+                columnDefs: columnDefs,
+                rowData: [],
+                defaultColDef: {
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                    floatingFilter: true
+                },
+                animateRows: true,
+                rowSelection: 'multiple',
+                onCellValueChanged: onCellValueChanged,
+                pagination: true,
+                paginationPageSize: 50,
+                paginationPageSizeSelector: [20, 50, 100, 500],
+                enableCellChangeFlash: true,
+                suppressRowClickSelection: true
+            };
+            
+            const gridDiv = document.querySelector('#jobsGrid');
+            gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        }
+        
+        // Initialize SQL Editor
+        function initSQLEditor() {
+            require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' }});
+            require(['vs/editor/editor.main'], function() {
+                sqlEditor = monaco.editor.create(document.getElementById('sqlEditor'), {
+                    value: 'SELECT * FROM jobs LIMIT 10;',
+                    language: 'sql',
+                    theme: 'vs-dark',
+                    automaticLayout: true,
+                    minimap: { enabled: false },
+                    fontSize: 14
+                });
+            });
+        }
+        
+        // Cell value changed handler
+        async function onCellValueChanged(event) {
+            const job = event.data;
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/jobs/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(job)
+                });
+                
+                if (response.ok) {
+                    showNotification('Job updated successfully', 'success');
+                } else {
+                    throw new Error('Failed to update job');
+                }
+            } catch (error) {
+                showNotification('Error updating job: ' + error.message, 'error');
+                refreshData(); // Reload to revert changes
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Refresh data
+        async function refreshData() {
+            try {
+                // Fetch ComfyUI jobs data
+                const jobsResponse = await fetch('/api/jobs');
+                const jobs = await jobsResponse.json();
+                
+                jobsData = jobs;
+                
+                // Update grid
+                if (gridApi) {
+                    gridApi.setGridOption('rowData', jobs);
+                }
+                
+                // Update ComfyUI job stats
+                updateStats(jobs);
+                
+                // Update ComfyUI job charts
+                updateCharts(jobs);
+                
+                // Fetch audiobook data for overview
+                try {
+                    const audiobooksResponse = await fetch('/api/audiobooks');
+                    if (audiobooksResponse.ok) {
+                        const audiobooksData = await audiobooksResponse.json();
+                        updateAudiobookStats(audiobooksData.books || []);
+                    } else {
+                        console.warn('Audiobooks API not available or failed');
+                        // Set audiobook stats to 0 if API fails
+                        updateAudiobookStats([]);
+                    }
+                } catch (audiobookError) {
+                    console.warn('Error fetching audiobook data for overview:', audiobookError);
+                    // Set audiobook stats to 0 if API fails  
+                    updateAudiobookStats([]);
+                }
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                showNotification('Error fetching data', 'error');
+            }
+        }
+        
+        // Update audiobook statistics
+        function updateAudiobookStats(books) {
+            const totalBooks = books.length;
+            let completedBooks = 0;
+            let processingBooks = 0;
+            let failedBooks = 0;
+            
+            // Count books by pipeline stage for chart
+            const stageCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 12 stages
+            
+            books.forEach(book => {
+                const stage = book.current_stage || 1;
+                if (stage === 1) {
+                    completedBooks++;
+                    stageCounts[11]++; // Completed column
+                } else if (book.status_summary && book.status_summary.includes('❌')) {
+                    failedBooks++;
+                } else {
+                    processingBooks++;
+                    // Map stage to chart position (stage 2-12 maps to positions 0-10)
+                    const chartIndex = Math.max(0, Math.min(10, stage - 2));
+                    stageCounts[chartIndex]++;
+                }
+            });
+            
+            // Update DOM elements
+            document.getElementById('statTotalBooks').textContent = totalBooks;
+            document.getElementById('statBooksCompleted').textContent = completedBooks;
+            document.getElementById('statBooksProcessing').textContent = processingBooks;
+            document.getElementById('statBooksFailed').textContent = failedBooks;
+            
+            // Update pipeline chart
+            if (pipelineChart) {
+                pipelineChart.data.datasets[0].data = stageCounts;
+                pipelineChart.update();
+            }
+        }
+        
+        // Update statistics
+        function updateStats(jobs) {
+            const stats = {
+                pending: 0,
+                processing: 0,
+                completed: 0,
+                done: 0,
+                failed: 0
+            };
+            
+            jobs.forEach(job => {
+                if (stats.hasOwnProperty(job.status)) {
+                    stats[job.status]++;
+                }
+            });
+            
+            document.getElementById('statPending').textContent = stats.pending;
+            document.getElementById('statProcessing').textContent = stats.processing;
+            document.getElementById('statCompleted').textContent = stats.completed + stats.done;
+            document.getElementById('statFailed').textContent = stats.failed;
+        }
+        
+        // Update charts
+        function updateCharts(jobs) {
+            const statusCounts = {};
+            jobs.forEach(job => {
+                statusCounts[job.status] = (statusCounts[job.status] || 0) + 1;
+            });
+            
+            // Update distribution chart
+            distributionChart.data.datasets[0].data = [
+                statusCounts.pending || 0,
+                statusCounts.processing || 0,
+                (statusCounts.completed || 0) + (statusCounts.done || 0),
+                statusCounts.failed || 0
+            ];
+            distributionChart.update();
+            
+            // Update timeline chart (last 10 completed) with error handling
+            try {
+                if (timelineChart) {
+                    const completed = jobs
+                        .filter(j => (j.status === 'completed' || j.status === 'done') && j.end_time)
+                        .sort((a, b) => new Date(b.end_time) - new Date(a.end_time))
+                        .slice(0, 10)
+                        .reverse();
+                    
+                    timelineChart.data.labels = completed.map(j => 
+                        new Date(j.end_time).toLocaleTimeString()
+                    );
+                    timelineChart.data.datasets[0].data = completed.map((j, i) => i + 1);
+                    timelineChart.update();
+                } else {
+                    console.warn('⚠️  Timeline chart not available, skipping update');
+                }
+            } catch (error) {
+                console.error('❌ Timeline chart update failed:', error);
+            }
+        }
+        
+        // Original switchTab function - will be overridden below for audiobooks support
+        
+        // Delete selected rows
+        async function deleteSelected() {
+            const selectedRows = gridApi.getSelectedRows();
+            if (selectedRows.length === 0) {
+                alert('Please select rows to delete');
                 return;
             }
             
-            const html = jobs.map(job => `
-                <div class="job-item">
-                    <div class="job-name">${job.config_name}</div>
-                    <div class="status ${job.status}">${job.status}</div>
-                    <div class="priority">Priority: ${job.priority}</div>
-                    <div>Retries: ${job.retries_attempted || 0}</div>
-                    <div class="actions">
-                        ${job.status === 'failed' ? 
-                            `<button class="btn btn-primary" onclick="retryJob('${job.config_name}')">Retry</button>` : ''}
-                        ${job.status === 'pending' ? 
-                            `<button class="btn btn-warning" onclick="openPriorityModal('${job.config_name}', ${job.priority})">Priority</button>
-                             <button class="btn btn-danger" onclick="applyGodMode('${job.config_name}')">God Mode</button>` : ''}
-                    </div>
-                </div>
-                ${job.error_trace ? 
-                    `<div class="error-trace" style="display: block">Error: ${job.error_trace}</div>` : ''}
-            `).join('');
+            if (!confirm(`Delete ${selectedRows.length} selected jobs?`)) {
+                return;
+            }
             
-            container.innerHTML = html;
-        }
-        
-        async function retryJob(configName) {
+            showLoading(true);
+            
             try {
-                const response = await fetch(`/api/queue/${configName}/retry`, {
-                    method: 'POST'
+                const ids = selectedRows.map(row => row.id);
+                const response = await fetch('/api/jobs/bulk-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
                 });
                 
                 if (response.ok) {
-                    fetchJobs(currentStatus);
-                    fetchStats();
+                    showNotification(`Deleted ${ids.length} jobs`, 'success');
+                    refreshData();
                 } else {
-                    alert('Failed to retry job');
+                    throw new Error('Failed to delete jobs');
                 }
             } catch (error) {
-                console.error('Error retrying job:', error);
+                showNotification('Error deleting jobs: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
             }
         }
         
-        function openPriorityModal(configName, currentPriority) {
-            selectedJob = configName;
-            document.getElementById('priority-input').value = currentPriority;
-            document.getElementById('priority-modal').classList.add('show');
-        }
-        
-        function closePriorityModal() {
-            document.getElementById('priority-modal').classList.remove('show');
-            selectedJob = null;
-        }
-        
-        async function savePriority() {
-            if (!selectedJob) return;
+        // Retry selected jobs
+        async function retrySelected() {
+            const selectedRows = gridApi.getSelectedRows();
+            const failedJobs = selectedRows.filter(j => j.status === 'failed');
             
-            const priority = parseInt(document.getElementById('priority-input').value);
+            if (failedJobs.length === 0) {
+                alert('Please select failed jobs to retry');
+                return;
+            }
+            
+            showLoading(true);
             
             try {
-                const response = await fetch(`/api/queue/${selectedJob}/priority`, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({priority})
+                const ids = failedJobs.map(row => row.id);
+                const response = await fetch('/api/jobs/bulk-retry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
                 });
                 
                 if (response.ok) {
-                    closePriorityModal();
-                    fetchJobs(currentStatus);
+                    showNotification(`Retrying ${ids.length} jobs`, 'success');
+                    refreshData();
                 } else {
-                    alert('Failed to update priority');
+                    throw new Error('Failed to retry jobs');
                 }
             } catch (error) {
-                console.error('Error updating priority:', error);
+                showNotification('Error retrying jobs: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
             }
         }
         
-        async function applyGodMode(configName) {
-            if (!confirm('Apply God Mode to this job? (Sets priority to 1)')) return;
-            
-            try {
-                const response = await fetch(`/api/queue/${configName}/god-mode`, {
-                    method: 'POST'
-                });
-                
-                if (response.ok) {
-                    fetchJobs(currentStatus);
-                } else {
-                    alert('Failed to apply God Mode');
-                }
-            } catch (error) {
-                console.error('Error applying God Mode:', error);
-            }
-        }
-        
-        // Tab switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentStatus = tab.dataset.status;
-                fetchJobs(currentStatus);
+        // Export data
+        function exportData() {
+            gridApi.exportDataAsCsv({
+                fileName: `jobs_export_${new Date().toISOString().split('T')[0]}.csv`
             });
-        });
+        }
         
-        // Initial load
-        fetchStats();
-        fetchJobs();
-        
-        // Auto-refresh every 2 seconds
-        setInterval(() => {
-            if (autoRefresh) {
-                fetchStats();
-                fetchJobs(currentStatus);
+        // Execute SQL
+        async function executeSQL() {
+            const query = sqlEditor.getValue();
+            if (!query.trim()) {
+                alert('Please enter a SQL query');
+                return;
             }
-        }, 2000);
-        
-        // Pause auto-refresh when modal is open
-        document.getElementById('priority-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'priority-modal') {
-                closePriorityModal();
+            
+            showLoading(true);
+            const resultsDiv = document.getElementById('sqlResults');
+            
+            try {
+                const response = await fetch('/api/sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Query failed');
+                }
+                
+                displaySQLResults(data);
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div style="color: #ef4444;">Error: ${error.message}</div>`;
+            } finally {
+                showLoading(false);
             }
-        });
+        }
+        
+        // Display SQL results
+        function displaySQLResults(data) {
+            const resultsDiv = document.getElementById('sqlResults');
+            
+            if (data.type === 'select') {
+                if (data.rows.length === 0) {
+                    resultsDiv.innerHTML = '<p>No results found</p>';
+                    return;
+                }
+                
+                let html = `<p style="color: #10b981;">Query returned ${data.count} row(s)</p>`;
+                html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr>';
+                
+                // Headers
+                data.columns.forEach(col => {
+                    html += `<th style="border: 1px solid rgba(255,255,255,0.2); padding: 8px; background: rgba(124,58,237,0.2);">${col}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                // Rows
+                data.rows.forEach(row => {
+                    html += '<tr>';
+                    data.columns.forEach(col => {
+                        const value = row[col];
+                        html += `<td style="border: 1px solid rgba(255,255,255,0.2); padding: 8px;">${value !== null ? value : 'NULL'}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div>';
+                resultsDiv.innerHTML = html;
+                
+            } else if (data.type === 'update') {
+                resultsDiv.innerHTML = `<p style="color: #10b981;">${data.message}</p>`;
+                refreshData(); // Refresh grid after update
+            }
+        }
+        
+        // Load SQL template
+        function loadSQLTemplate() {
+            const select = document.getElementById('sqlTemplates');
+            if (select.value && sqlEditor) {
+                sqlEditor.setValue(select.value);
+            }
+        }
+        
+        // Show loading overlay
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('active', show);
+        }
+        
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            const text = document.getElementById('notificationText');
+            
+            text.textContent = message;
+            notification.className = `notification show ${type}`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Add new job (placeholder)
+        function addNewJob() {
+            alert('Add new job functionality coming soon!');
+        }
+        
+        ////////////////////////////////////////////////////////////////////////////////
+        // AUDIOBOOKS DASHBOARD FUNCTIONALITY
+        ////////////////////////////////////////////////////////////////////////////////
+        
+        let audiobooksGridApi;
+        
+        // Initialize audiobooks grid when tab is first clicked
+        function initializeAudiobooksGrid() {
+            if (audiobooksGridApi) return; // Already initialized
+            
+            console.log('🔧 Initializing audiobooks grid...');
+            
+            const columnDefs = [
+                { 
+                    field: 'book_id', 
+                    headerName: 'ID', 
+                    width: 100,
+                    cellRenderer: params => `<span style="font-family: monospace; color: var(--primary);">${params.value}</span>`
+                },
+                { 
+                    field: 'book_title', 
+                    headerName: 'Title', 
+                    width: 300,
+                    cellRenderer: params => `<strong>${params.value}</strong>`
+                },
+                { 
+                    field: 'author', 
+                    headerName: 'Author', 
+                    width: 200 
+                },
+                { 
+                    field: 'pipeline_progress', 
+                    headerName: 'Progress', 
+                    width: 150,
+                    cellRenderer: params => {
+                        const progress = params.value || 0;
+                        const color = progress === 100 ? 'var(--success)' : 
+                                     progress >= 50 ? 'var(--warning)' : 'var(--primary)';
+                        return `
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="flex: 1; background: rgba(255,255,255,0.1); border-radius: 10px; height: 8px;">
+                                    <div style="width: ${progress}%; background: ${color}; height: 100%; border-radius: 10px;"></div>
+                                </div>
+                                <span style="font-size: 12px; min-width: 35px;">${progress}%</span>
+                            </div>
+                        `;
+                    }
+                },
+                { 
+                    field: 'status_summary', 
+                    headerName: 'Current Step', 
+                    width: 200,
+                    cellRenderer: params => `<span style="font-size: 12px;">${params.value}</span>`
+                },
+                { 
+                    field: 'updated_at', 
+                    headerName: 'Last Updated', 
+                    width: 180,
+                    valueFormatter: params => {
+                        if (!params.value) return '-';
+                        return new Date(params.value).toLocaleString();
+                    }
+                },
+                {
+                    headerName: 'Actions',
+                    width: 120,
+                    cellRenderer: params => {
+                        return `
+                            <button onclick="viewBookDetails('${params.data.book_id}')" 
+                                    style="padding: 4px 8px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        `;
+                    }
+                }
+            ];
+            
+            const gridOptions = {
+                columnDefs: columnDefs,
+                defaultColDef: {
+                    sortable: true,
+                    filter: true,
+                    resizable: true
+                },
+                rowSelection: 'multiple',
+                animateRows: true,
+                theme: 'ag-theme-quartz-dark'
+            };
+            
+            const gridDiv = document.querySelector('#audiobooksGrid');
+            
+            if (!gridDiv) {
+                console.error('❌ Audiobooks grid div not found!');
+                return;
+            }
+            
+            console.log('🔧 Creating AG-Grid...');
+            try {
+                audiobooksGridApi = agGrid.createGrid(gridDiv, gridOptions);
+                console.log('✅ AG-Grid created successfully');
+                
+                // Load initial data
+                refreshAudiobooks();
+            } catch (error) {
+                console.error('❌ Failed to create AG-Grid:', error);
+            }
+        }
+        
+        // Load audiobooks data
+        async function refreshAudiobooks() {
+            try {
+                console.log('📡 Fetching audiobooks data...');
+                
+                // Update status display
+                const statusDiv = document.getElementById('audiobooksStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '🔄 Fetching data from API...';
+                }
+                
+                showLoading(true);
+                
+                const response = await fetch('/api/audiobooks');
+                console.log('📊 Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('📚 Received data:', data);
+                console.log(`📖 Number of books: ${data.books ? data.books.length : 'No books property'}`);
+                
+                if (data.books && data.books.length > 0) {
+                    // Show grid, hide status
+                    if (statusDiv) statusDiv.style.display = 'none';
+                    const gridDiv = document.getElementById('audiobooksGrid');
+                    if (gridDiv) gridDiv.style.display = 'block';
+                    
+                    if (audiobooksGridApi) {
+                        audiobooksGridApi.setGridOption('rowData', data.books);
+                        console.log('✅ Grid data updated');
+                    } else {
+                        console.error('❌ Grid API not available');
+                        if (statusDiv) {
+                            statusDiv.style.display = 'block';
+                            statusDiv.innerHTML = '❌ Grid not initialized. Check console for errors.';
+                        }
+                    }
+                } else {
+                    // No books found
+                    if (statusDiv) {
+                        statusDiv.style.display = 'block';
+                        statusDiv.innerHTML = '📭 No audiobooks found in database.';
+                    }
+                }
+                
+                showLoading(false);
+            } catch (error) {
+                console.error('❌ Error loading audiobooks:', error);
+                
+                // Show error in status div
+                const statusDiv = document.getElementById('audiobooksStatus');
+                if (statusDiv) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                }
+                
+                showNotification('Error loading audiobooks: ' + error.message, 'error');
+                showLoading(false);
+            }
+        }
+        
+        // View book details in modal
+        async function viewBookDetails(bookId) {
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/audiobooks/${bookId}`);
+                const book = await response.json();
+                
+                // Update modal content
+                document.getElementById('modalBookTitle').textContent = 
+                    `${book.book_title} by ${book.author} [${book.book_id}]`;
+                
+                // Create pipeline steps visualization
+                const stepsHtml = book.pipeline_steps.map(step => {
+                    const statusClass = step.status;
+                    const statusIcon = {
+                        'completed': '✅',
+                        'processing': '🔄', 
+                        'failed': '❌',
+                        'pending': '⚪'
+                    }[step.status] || '❓';
+                    
+                    return `
+                        <div class="pipeline-step ${statusClass}">
+                            <div class="step-indicator ${statusClass === 'completed' ? 'step-completed' : 
+                                                        statusClass === 'processing' ? 'step-processing' :
+                                                        statusClass === 'failed' ? 'step-failed' : 'step-pending'}">
+                                ${step.step}
+                            </div>
+                            <div style="flex: 1; margin-left: 15px;">
+                                <div style="font-weight: bold;">${statusIcon} ${step.name}</div>
+                                <div style="font-size: 12px; color: rgba(255,255,255,0.7);">${step.description}</div>
+                                ${step.started_at ? `<div style="font-size: 11px; color: rgba(255,255,255,0.5);">Started: ${new Date(step.started_at).toLocaleString()}</div>` : ''}
+                                ${step.completed_at ? `<div style="font-size: 11px; color: rgba(255,255,255,0.5);">Completed: ${new Date(step.completed_at).toLocaleString()}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                document.getElementById('pipelineSteps').innerHTML = stepsHtml;
+                
+                // Show book metadata
+                const metadataHtml = `
+                    <div style="margin-top: 20px;">
+                        <h4>Book Information</h4>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0;">
+                            <div><strong>Book ID:</strong> ${book.book_id}</div>
+                            <div><strong>Author:</strong> ${book.author}</div>
+                            <div><strong>Narrator:</strong> ${book.narrated_by || 'Not set'}</div>
+                            <div><strong>Added:</strong> ${book.created_at ? new Date(book.created_at).toLocaleString() : 'Unknown'}</div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('bookMetadata').innerHTML = metadataHtml;
+                
+                // Show modal
+                document.getElementById('bookDetailModal').style.display = 'block';
+                
+                showLoading(false);
+            } catch (error) {
+                console.error('Error loading book details:', error);
+                showNotification('Error loading book details: ' + error.message, 'error');
+                showLoading(false);
+            }
+        }
+        
+        // Close book detail modal
+        function closeBookModal() {
+            document.getElementById('bookDetailModal').style.display = 'none';
+        }
+        
+        // Filter audiobooks by status
+        function filterAudiobooks() {
+            const filterValue = document.getElementById('statusFilter').value;
+            if (audiobooksGridApi) {
+                audiobooksGridApi.setQuickFilter(filterValue);
+            }
+        }
+        
+        // Override switchTab function to handle audiobooks
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            // Initialize audiobooks grid when tab is clicked
+            if (tab === 'audiobooks') {
+                setTimeout(() => initializeAudiobooksGrid(), 100); // Small delay for DOM
+            }
+        }
     </script>
 </body>
 </html>
