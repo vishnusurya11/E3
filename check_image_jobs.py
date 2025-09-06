@@ -173,7 +173,7 @@ def check_image_jobs_completion(
             
             # Count completed image jobs for this book
             cursor.execute("""
-                SELECT COUNT(*) FROM jobs 
+                SELECT COUNT(*) FROM comfyui_jobs 
                 WHERE job_type = 'T2I' 
                 AND workflow_id = 'image_qwen_image'
                 AND (
@@ -188,7 +188,7 @@ def check_image_jobs_completion(
             
             # Count total image jobs for this book
             cursor.execute("""
-                SELECT COUNT(*) FROM jobs 
+                SELECT COUNT(*) FROM comfyui_jobs 
                 WHERE job_type = 'T2I' 
                 AND workflow_id = 'image_qwen_image'
                 AND (

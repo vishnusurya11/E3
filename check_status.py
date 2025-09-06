@@ -20,12 +20,12 @@ def check_database(db_path='database/comfyui_agent.db'):
     cursor = conn.cursor()
     
     # Check jobs
-    cursor.execute("SELECT COUNT(*) FROM jobs")
+    cursor.execute("SELECT COUNT(*) FROM comfyui_jobs")
     total = cursor.fetchone()[0]
     print(f"Total jobs: {total}")
     
     # Check by status
-    cursor.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status")
+    cursor.execute("SELECT status, COUNT(*) FROM comfyui_jobs GROUP BY status")
     status_counts = cursor.fetchall()
     
     for status, count in status_counts:

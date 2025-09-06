@@ -28,7 +28,7 @@ from comfyui_agent.utils.config_loader import load_env_file
 
 
 def validate_database_schema(db_path: str) -> bool:
-    """Validate that the database has the expected schema structure.
+    """Validate that the database has the expected schema structure for both tables.
     
     Args:
         db_path: Path to SQLite database file.
@@ -36,28 +36,73 @@ def validate_database_schema(db_path: str) -> bool:
     Returns:
         True if schema is valid, False otherwise.
     """
-    expected_columns = {
+    expected_comfyui_columns = {
         'id', 'config_name', 'job_type', 'workflow_id', 'priority', 'status',
         'run_count', 'retries_attempted', 'retry_limit', 'start_time', 'end_time',
         'duration', 'error_trace', 'metadata', 'worker_id', 'lease_expires_at'
     }
     
+    expected_audiobook_columns = {
+        'id', 'book_id', 'book_title', 'author', 'narrated_by', 'input_file',
+        'narrator_audio', 'created_at', 'updated_at', 'parse_novel_status',
+        'parse_novel_completed_at', 'metadata_status', 'metadata_completed_at',
+        'total_chapters', 'total_chunks', 'total_words', 'audio_generation_status',
+        'audio_generation_completed_at', 'audio_jobs_completed', 'total_audio_files',
+        'audio_duration_seconds', 'audio_file_size_bytes', 'audio_files_moved_status',
+        'audio_files_moved_completed_at', 'audio_combination_planned_status',
+        'audio_combination_planned_completed_at', 'audio_combination_status',
+        'audio_combination_completed_at', 'image_prompts_status', 'image_prompts_started_at',
+        'image_prompts_completed_at', 'image_jobs_generation_status',
+        'image_jobs_generation_completed_at', 'image_jobs_completed', 'total_image_jobs',
+        'image_generation_status', 'image_generation_completed_at',
+        'subtitle_generation_status', 'subtitle_generation_completed_at',
+        'video_generation_status', 'video_generation_started_at',
+        'video_generation_completed_at', 'total_videos_created', 'metadata',
+        'retry_count', 'max_retries'
+    }
+    
     try:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(jobs)")
-            columns = {row[1] for row in cursor.fetchall()}  # row[1] is column name
             
-            missing = expected_columns - columns
+            # Validate comfyui_jobs table
+            cursor.execute("PRAGMA table_info(comfyui_jobs)")
+            comfyui_columns = {row[1] for row in cursor.fetchall()}
+            
+            missing = expected_comfyui_columns - comfyui_columns
             if missing:
-                print(f"❌ Missing columns in jobs table: {missing}")
+                print(f"❌ Missing columns in comfyui_jobs table: {missing}")
+                return False
+            
+            extra = comfyui_columns - expected_comfyui_columns
+            if extra:
+                print(f"⚠️  Extra columns in comfyui_jobs table: {extra}")
+            
+            print(f"✅ ComfyUI jobs table validated - {len(comfyui_columns)} columns present")
+            
+            # Validate audiobook_processing table
+            cursor.execute("PRAGMA table_info(audiobook_processing)")
+            audiobook_columns = {row[1] for row in cursor.fetchall()}
+            
+            missing = expected_audiobook_columns - audiobook_columns
+            if missing:
+                print(f"❌ Missing columns in audiobook_processing table: {missing}")
                 return False
                 
-            extra = columns - expected_columns
+            extra = audiobook_columns - expected_audiobook_columns  
             if extra:
-                print(f"⚠️  Extra columns in jobs table: {extra}")
+                print(f"⚠️  Extra columns in audiobook_processing table: {extra}")
             
-            print(f"✅ Database schema validated - {len(columns)} columns present")
+            print(f"✅ Audiobook processing table validated - {len(audiobook_columns)} columns present")
+            
+            # Check WAL mode
+            cursor.execute("PRAGMA journal_mode")
+            journal_mode = cursor.fetchone()[0]
+            if journal_mode.upper() == 'WAL':
+                print(f"✅ WAL mode enabled for concurrent access")
+            else:
+                print(f"⚠️  Journal mode is {journal_mode}, not WAL")
+            
             return True
             
     except Exception as e:
@@ -85,9 +130,7 @@ def create_directories(config: dict) -> None:
         Path(config['paths']['jobs_finished']) / 'video',
         Path(config['paths']['jobs_finished']) / 'audio',
         Path(config['paths']['jobs_finished']) / '3d',
-        Path('foundry/input'),
-        Path('foundry/processing'),
-        Path('foundry/finished'),
+        Path('foundry'),  # Base foundry directory - books create their own folders
         Path('workflows'),
         Path('logs')
     ]

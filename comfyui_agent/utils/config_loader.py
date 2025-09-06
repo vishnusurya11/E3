@@ -121,7 +121,7 @@ def _validate_and_transform_config(config: Dict[str, Any], env: str) -> Dict[str
         "paths": {
             "jobs_processing": config["paths"]["jobs_processing"],
             "jobs_finished": config["paths"]["jobs_finished"],
-            "database": config["databases"]["comfyui"]  # Map databases.comfyui -> paths.database
+            "database": config["databases"]["main"]  # Map databases.main -> paths.database
         },
         "comfyui": {
             "api_base_url": config["comfyui"]["api_base_url"],
@@ -136,7 +136,7 @@ def _validate_and_transform_config(config: Dict[str, Any], env: str) -> Dict[str
             raise ValueError(f"Missing required section: {section}")
     
     # Validate required database paths
-    required_db_keys = ["comfyui"]
+    required_db_keys = ["main"]
     for key in required_db_keys:
         if key not in config["databases"]:
             raise ValueError(f"Missing required database key: {key}")

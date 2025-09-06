@@ -1,10 +1,9 @@
 # E3 Alpha Environment Configuration
 # Complete configuration for ComfyUI Agent and Audiobook Pipeline
 
-# Database Configuration
+# Database Configuration - Single Database with WAL Mode
 databases:
-  comfyui: "database/alpha_comfyui_agent.db"
-  audiobook: "database/alpha_audiobook.db"
+  main: "database/alpha_e3_agent.db"
 
 # ComfyUI Job Processing Paths  
 paths:

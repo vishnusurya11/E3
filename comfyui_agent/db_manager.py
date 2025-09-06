@@ -12,6 +12,29 @@ from typing import Dict, Any, Optional, List
 from contextlib import contextmanager
 
 
+def configure_wal_mode(db_path: str) -> None:
+    """Configure database for optimal concurrent access with WAL mode.
+    
+    Enables WAL (Write-Ahead Logging) mode for concurrent readers + single writer,
+    optimizes cache size and synchronization settings for better performance.
+    
+    Args:
+        db_path: Path to SQLite database file.
+    """
+    with sqlite3.connect(db_path) as conn:
+        # Enable WAL mode for concurrent readers + single writer
+        conn.execute("PRAGMA journal_mode=WAL")
+        # Increase cache size for better performance (10MB)
+        conn.execute("PRAGMA cache_size=10000")
+        # Enable foreign keys
+        conn.execute("PRAGMA foreign_keys=ON")
+        # Set synchronous to NORMAL for better performance
+        conn.execute("PRAGMA synchronous=NORMAL")
+        # Set WAL checkpoint size
+        conn.execute("PRAGMA wal_autocheckpoint=1000")
+        conn.commit()
+
+
 @contextmanager
 def get_db_connection(db_path: str):
     """Context manager for database connections.
@@ -37,23 +60,27 @@ def get_db_connection(db_path: str):
 
 
 def init_db(db_path: str) -> None:
-    """Initialize database schema and indices.
+    """Initialize database schema and indices with WAL mode.
     
-    Creates jobs table with all required columns and indices.
+    Creates both comfyui_jobs and audiobook_processing tables with all required 
+    columns and indices. Configures WAL mode for concurrent access.
     Idempotent - safe to call multiple times.
     
     Args:
         db_path: Path to SQLite database file.
         
     Examples:
-        >>> init_db("database/comfyui_agent.db")
+        >>> init_db("database/e3_agent.db")
     """
+    # Configure WAL mode first
+    configure_wal_mode(db_path)
+    
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
         
-        # Create jobs table
+        # Create ComfyUI jobs table (renamed from 'jobs')
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS jobs (
+            CREATE TABLE IF NOT EXISTS comfyui_jobs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 config_name TEXT NOT NULL UNIQUE,
                 job_type TEXT NOT NULL,
@@ -73,20 +100,101 @@ def init_db(db_path: str) -> None:
             )
         """)
         
-        # Create indices for performance
+        # Create audiobook processing table with workflow-ordered columns
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_jobs_status_priority
-            ON jobs(status, priority)
+            CREATE TABLE IF NOT EXISTS audiobook_processing (
+                -- Core Book Info
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id TEXT NOT NULL,
+                book_title TEXT NOT NULL,
+                author TEXT,
+                narrated_by TEXT,
+                input_file TEXT NOT NULL,
+                narrator_audio TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                
+                -- Step 1: Parse Novel
+                parse_novel_status TEXT DEFAULT 'pending',
+                parse_novel_completed_at TEXT,
+                metadata_status TEXT DEFAULT 'pending',
+                metadata_completed_at TEXT,
+                total_chapters INTEGER DEFAULT 0,
+                total_chunks INTEGER DEFAULT 0,
+                total_words INTEGER DEFAULT 0,
+                
+                -- Step 2: Audio Generation  
+                audio_generation_status TEXT DEFAULT 'pending',
+                audio_generation_completed_at TEXT,
+                audio_jobs_completed INTEGER DEFAULT 0,
+                total_audio_files INTEGER DEFAULT 0,
+                audio_duration_seconds INTEGER DEFAULT 0,
+                audio_file_size_bytes INTEGER DEFAULT 0,
+                audio_files_moved_status TEXT DEFAULT 'pending',
+                audio_files_moved_completed_at TEXT,
+                audio_combination_planned_status TEXT DEFAULT 'pending',
+                audio_combination_planned_completed_at TEXT,
+                audio_combination_status TEXT DEFAULT 'pending',
+                audio_combination_completed_at TEXT,
+                
+                -- Step 3: Image Generation
+                image_prompts_status TEXT DEFAULT 'pending',
+                image_prompts_started_at TEXT,
+                image_prompts_completed_at TEXT,
+                image_jobs_generation_status TEXT DEFAULT 'pending', 
+                image_jobs_generation_completed_at TEXT,
+                image_jobs_completed INTEGER DEFAULT 0,
+                total_image_jobs INTEGER DEFAULT 0,
+                image_generation_status TEXT DEFAULT 'pending',
+                image_generation_completed_at TEXT,
+                
+                -- Step 4: Subtitle Generation
+                subtitle_generation_status TEXT DEFAULT 'pending',
+                subtitle_generation_completed_at TEXT,
+                
+                -- Step 5: Video Generation
+                video_generation_status TEXT DEFAULT 'pending',
+                video_generation_started_at TEXT DEFAULT 'pending',
+                video_generation_completed_at TEXT,
+                total_videos_created INTEGER DEFAULT 0,
+                
+                -- Metadata & Control
+                metadata TEXT,
+                retry_count INTEGER DEFAULT 0,
+                max_retries INTEGER DEFAULT 3
+            )
+        """)
+        
+        # Create indices for ComfyUI jobs performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_status_priority
+            ON comfyui_jobs(status, priority)
         """)
         
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_jobs_started
-            ON jobs(start_time)
+            CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_started
+            ON comfyui_jobs(start_time)
         """)
         
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_jobs_config_name
-            ON jobs(config_name)
+            CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_config_name
+            ON comfyui_jobs(config_name)
+        """)
+        
+        # Create indices for audiobook processing performance
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_audiobook_book_id
+            ON audiobook_processing(book_id)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_audiobook_status
+            ON audiobook_processing(parse_novel_status, audio_generation_status, video_generation_status)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_audiobook_created
+            ON audiobook_processing(created_at)
         """)
 
 
@@ -110,7 +218,7 @@ def upsert_job(db_path: str, job_data: Dict[str, Any]) -> int:
         cursor = conn.cursor()
         
         # Check if job exists
-        cursor.execute("SELECT id, status FROM jobs WHERE config_name = ?",
+        cursor.execute("SELECT id, status FROM comfyui_jobs WHERE config_name = ?",
                       (job_data["config_name"],))
         existing = cursor.fetchone()
         
@@ -123,13 +231,13 @@ def upsert_job(db_path: str, job_data: Dict[str, Any]) -> int:
                 # Don't reprocess completed jobs - only update priority if provided
                 if "priority" in job_data:
                     cursor.execute(
-                        "UPDATE jobs SET priority = ? WHERE id = ?",
+                        "UPDATE comfyui_jobs SET priority = ? WHERE id = ?",
                         (job_data["priority"], job_id)
                     )
             elif existing_status == "failed":
                 # Reset failed jobs so they can be retried
                 cursor.execute(
-                    "UPDATE jobs SET status = 'pending', retries_attempted = 0, priority = ? WHERE id = ?",
+                    "UPDATE comfyui_jobs SET status = 'pending', retries_attempted = 0, priority = ? WHERE id = ?",
                     (job_data.get("priority", 50), job_id)
                 )
             else:
@@ -145,7 +253,7 @@ def upsert_job(db_path: str, job_data: Dict[str, Any]) -> int:
                 if update_fields:
                     update_values.append(job_id)
                     cursor.execute(
-                        f"UPDATE jobs SET {', '.join(update_fields)} WHERE id = ?",
+                        f"UPDATE comfyui_jobs SET {', '.join(update_fields)} WHERE id = ?",
                         update_values
                     )
         else:
@@ -176,7 +284,7 @@ def upsert_job(db_path: str, job_data: Dict[str, Any]) -> int:
                     placeholders.append("?")
             
             cursor.execute(
-                f"INSERT INTO jobs ({', '.join(fields[:len(values)])}) "
+                f"INSERT INTO comfyui_jobs ({', '.join(fields[:len(values)])}) "
                 f"VALUES ({', '.join(placeholders)})",
                 values
             )
@@ -208,7 +316,7 @@ def lease_next_job(db_path: str, worker_id: str, lease_seconds: int) -> Optional
         # Select next pending job ordered by priority then config_name (for sequential processing)
         # This ensures s0001 is processed before s0002 for SPEECH jobs
         cursor.execute("""
-            SELECT * FROM jobs
+            SELECT * FROM comfyui_jobs
             WHERE status = 'pending'
             ORDER BY priority ASC, config_name ASC
             LIMIT 1
@@ -223,7 +331,7 @@ def lease_next_job(db_path: str, worker_id: str, lease_seconds: int) -> Optional
         
         # Update job to processing with lease
         cursor.execute("""
-            UPDATE jobs
+            UPDATE comfyui_jobs
             SET status = 'processing',
                 worker_id = ?,
                 lease_expires_at = ?,
@@ -233,7 +341,7 @@ def lease_next_job(db_path: str, worker_id: str, lease_seconds: int) -> Optional
         """, (worker_id, lease_expires, datetime.now().isoformat(), job["id"]))
         
         # Return updated job as dictionary
-        cursor.execute("SELECT * FROM jobs WHERE id = ?", (job["id"],))
+        cursor.execute("SELECT * FROM comfyui_jobs WHERE id = ?", (job["id"],))
         updated_job = cursor.fetchone()
         
         return dict(updated_job)
@@ -261,7 +369,7 @@ def complete_job(db_path: str, job_id: int, *, success: bool,
         # Get current job state
         cursor.execute("""
             SELECT start_time, retries_attempted, retry_limit
-            FROM jobs WHERE id = ?
+            FROM comfyui_jobs WHERE id = ?
         """, (job_id,))
         job = cursor.fetchone()
         
@@ -278,7 +386,7 @@ def complete_job(db_path: str, job_id: int, *, success: bool,
         if success:
             # Mark as done
             cursor.execute("""
-                UPDATE jobs
+                UPDATE comfyui_jobs
                 SET status = 'done',
                     end_time = ?,
                     duration = ?,
@@ -295,7 +403,7 @@ def complete_job(db_path: str, job_id: int, *, success: bool,
             if retries_attempted < retry_limit:
                 # Requeue for retry
                 cursor.execute("""
-                    UPDATE jobs
+                    UPDATE comfyui_jobs
                     SET status = 'pending',
                         retries_attempted = ?,
                         error_trace = ?,
@@ -306,7 +414,7 @@ def complete_job(db_path: str, job_id: int, *, success: bool,
             else:
                 # Mark as failed
                 cursor.execute("""
-                    UPDATE jobs
+                    UPDATE comfyui_jobs
                     SET status = 'failed',
                         end_time = ?,
                         duration = ?,
@@ -342,7 +450,7 @@ def recover_orphans(db_path: str, now: datetime) -> int:
         
         # Find and update orphaned jobs
         cursor.execute("""
-            UPDATE jobs
+            UPDATE comfyui_jobs
             SET status = 'pending',
                 worker_id = NULL,
                 lease_expires_at = NULL
@@ -368,7 +476,7 @@ def get_job_by_config_name(db_path: str, config_name: str) -> Optional[Dict[str,
     """
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM jobs WHERE config_name = ?", (config_name,))
+        cursor.execute("SELECT * FROM comfyui_jobs WHERE config_name = ?", (config_name,))
         job = cursor.fetchone()
         return dict(job) if job else None
 
@@ -391,13 +499,13 @@ def list_jobs_by_status(db_path: str, status: Optional[str] = None) -> List[Dict
         
         if status:
             cursor.execute("""
-                SELECT * FROM jobs
+                SELECT * FROM comfyui_jobs
                 WHERE status = ?
                 ORDER BY priority ASC, config_name ASC
             """, (status,))
         else:
             cursor.execute("""
-                SELECT * FROM jobs
+                SELECT * FROM comfyui_jobs
                 ORDER BY priority ASC, config_name ASC
             """)
         

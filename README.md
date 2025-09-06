@@ -22,10 +22,13 @@ E3/
 ├── comfyui_jobs/           # ComfyUI Agent job processing
 │   ├── processing/         # Input job files (YAML configs)
 │   └── finished/           # Generated outputs
-├── foundry/                # Audiobook pipeline
-│   ├── input/              # Book input files  
-│   ├── processing/         # Work in progress
-│   └── finished/           # Completed audiobooks
+├── foundry/                # Book-centric content management
+│   ├── pg98/              # Project Gutenberg book 98
+│   │   ├── input.html     # Original book file
+│   │   ├── audiobook/     # Audio files, chapters, metadata
+│   │   ├── images/        # Book illustrations, covers
+│   │   └── videos/        # Future: video adaptations
+│   └── pg123/             # Another book...
 └── initialize.py           # Environment setup script
 ```
 
@@ -35,10 +38,21 @@ E3/
 3. Run `python initialize.py` - automatically uses correct config and database
 
 ### **Environment Differences**
-- **Alpha**: `database/alpha_comfyui_agent.db`, `logs/e3_alpha.log`
-- **Production**: `database/comfyui_agent.db`, `logs/e3_prod.log`
+- **Alpha**: `database/alpha_e3_agent.db`, `logs/e3_alpha.log`
+- **Production**: `database/e3_agent.db`, `logs/e3_prod.log`
 - **Cross-platform**: Works on Windows, Linux, Mac, and EC2
-- **Clean separation**: `comfyui_jobs/` for ComfyUI agent, `foundry/` for audiobooks
+- **Clean separation**: `comfyui_jobs/` for ComfyUI agent, `foundry/` for books
+
+### **Book-Centric Architecture**
+E3 uses a scalable, content-first approach for media management:
+
+- **Each book gets its own folder** under `foundry/` (e.g., `foundry/pg98/`)
+- **Book ID as folder name** - typically Project Gutenberg IDs like `pg98`, `pg123`
+- **All book assets in one place** - audiobooks, images, videos, and metadata
+- **Extensible design** - easy to add new media types (`movies/`, `podcasts/`, `games/`)
+- **Netflix-style content management** - each book becomes a complete media franchise
+- **Simple operations** - backup, share, or delete entire book by folder
+- **Future-ready** - supports multi-format adaptations of the same source content
 
 ### **Configuration Philosophy**
 - **`.env`** = Infrastructure (API keys, hosts, ports) - what changes between deployments

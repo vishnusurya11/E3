@@ -245,7 +245,7 @@ async def retry_job(config_name: str):
         with get_db_connection(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE jobs
+                UPDATE comfyui_jobs
                 SET status = 'pending',
                     error_trace = NULL,
                     worker_id = NULL,
@@ -315,19 +315,19 @@ async def get_stats():
             # Get counts by status
             cursor.execute("""
                 SELECT status, COUNT(*) as count
-                FROM jobs
+                FROM comfyui_jobs
                 GROUP BY status
             """)
             status_counts = {row["status"]: row["count"] for row in cursor.fetchall()}
             
             # Get total jobs
-            cursor.execute("SELECT COUNT(*) as total FROM jobs")
+            cursor.execute("SELECT COUNT(*) as total FROM comfyui_jobs")
             total = cursor.fetchone()["total"]
             
             # Get average duration for completed jobs
             cursor.execute("""
                 SELECT AVG(duration) as avg_duration
-                FROM jobs
+                FROM comfyui_jobs
                 WHERE status = 'done' AND duration IS NOT NULL
             """)
             avg_duration = cursor.fetchone()["avg_duration"]
@@ -361,7 +361,7 @@ async def list_all_jobs():
                     retries_attempted, retry_limit, error_trace, metadata,
                     worker_id, lease_expires_at, start_time, end_time,
                     duration
-                FROM jobs
+                FROM comfyui_jobs
                 ORDER BY id DESC
             """)
             
@@ -410,7 +410,7 @@ async def retry_job_by_id(job_id: int):
             cursor = conn.cursor()
             
             # Check if job exists
-            cursor.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+            cursor.execute("SELECT * FROM comfyui_jobs WHERE id = ?", (job_id,))
             job = cursor.fetchone()
             
             if not job:
@@ -418,7 +418,7 @@ async def retry_job_by_id(job_id: int):
             
             # Reset job to pending
             cursor.execute("""
-                UPDATE jobs
+                UPDATE comfyui_jobs
                 SET status = 'pending',
                     error_trace = NULL,
                     worker_id = NULL,
@@ -453,7 +453,7 @@ async def retry_all_failed():
             
             # Reset all failed jobs to pending
             cursor.execute("""
-                UPDATE jobs
+                UPDATE comfyui_jobs
                 SET status = 'pending',
                     error_trace = NULL,
                     worker_id = NULL,
@@ -524,7 +524,7 @@ async def export_jobs_csv():
                     id, config_name, job_type, workflow_id, priority, status,
                     retries_attempted, retry_limit, error_trace,
                     worker_id, created_at, start_time, end_time, duration
-                FROM jobs
+                FROM comfyui_jobs
                 ORDER BY id DESC
             """)
             
@@ -599,7 +599,7 @@ async def update_job(job: Dict[str, Any]):
         
         with get_db_connection(db_path) as conn:
             cursor = conn.cursor()
-            query = f"UPDATE jobs SET {', '.join(updates)} WHERE id = ?"
+            query = f"UPDATE comfyui_jobs SET {', '.join(updates)} WHERE id = ?"
             cursor.execute(query, values)
             
             return {"status": "success", "updated": cursor.rowcount}
@@ -632,7 +632,7 @@ async def bulk_delete_jobs(request: Dict[str, Any]):
         with get_db_connection(db_path) as conn:
             cursor = conn.cursor()
             placeholders = ','.join('?' * len(ids))
-            cursor.execute(f"DELETE FROM jobs WHERE id IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM comfyui_jobs WHERE id IN ({placeholders})", ids)
             
             return {"status": "success", "deleted": cursor.rowcount}
             
@@ -665,7 +665,7 @@ async def bulk_retry_jobs(request: Dict[str, Any]):
             cursor = conn.cursor()
             placeholders = ','.join('?' * len(ids))
             cursor.execute(f"""
-                UPDATE jobs
+                UPDATE comfyui_jobs
                 SET status = 'pending',
                     error_trace = NULL,
                     worker_id = NULL,

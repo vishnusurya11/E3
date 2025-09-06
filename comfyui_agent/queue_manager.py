@@ -72,7 +72,7 @@ def set_job_priority(db_path: str, config_name: str, priority: Any) -> None:
         
         # Update priority for the job
         cursor.execute("""
-            UPDATE jobs
+            UPDATE comfyui_jobs
             SET priority = ?
             WHERE config_name = ?
         """, (priority, config_name))

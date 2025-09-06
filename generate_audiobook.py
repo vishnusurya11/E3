@@ -225,7 +225,7 @@ def check_audio_jobs_completion(book_dict: Dict) -> bool:
             
             # Debug: Show some sample job names first
             cursor.execute("""
-                SELECT config_name, status FROM jobs 
+                SELECT config_name, status FROM comfyui_jobs 
                 WHERE config_name LIKE ? LIMIT 5
             """, (query_pattern,))
             sample_jobs = cursor.fetchall()
@@ -235,7 +235,7 @@ def check_audio_jobs_completion(book_dict: Dict) -> bool:
             
             # Now get the actual count
             cursor.execute("""
-                SELECT COUNT(*) FROM jobs 
+                SELECT COUNT(*) FROM comfyui_jobs 
                 WHERE config_name LIKE ? AND status = 'done'
             """, (query_pattern,))
             

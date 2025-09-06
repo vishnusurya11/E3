@@ -70,7 +70,7 @@ class TestInitDb:
         # Assert - Should not raise and db should be valid
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM jobs")
+        cursor.execute("SELECT COUNT(*) FROM comfyui_jobs")
         assert cursor.fetchone()[0] == 0  # No jobs yet
         conn.close()
 
@@ -100,7 +100,7 @@ class TestUpsertJob:
         assert job_id > 0
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM jobs WHERE id=?", (job_id,))
+        cursor.execute("SELECT * FROM comfyui_jobs WHERE id=?", (job_id,))
         row = cursor.fetchone()
         assert row is not None
         conn.close()
@@ -133,7 +133,7 @@ class TestUpsertJob:
         assert job_id1 == job_id2
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT status, priority FROM jobs WHERE id=?", (job_id1,))
+        cursor.execute("SELECT status, priority FROM comfyui_jobs WHERE id=?", (job_id1,))
         status, priority = cursor.fetchone()
         assert status == "done"  # Not regressed
         assert priority == 10  # Other field updated
@@ -312,7 +312,7 @@ class TestCompleteJob:
         # Assert
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT status, metadata, end_time FROM jobs WHERE id=?", (job_id,))
+        cursor.execute("SELECT status, metadata, end_time FROM comfyui_jobs WHERE id=?", (job_id,))
         status, metadata, end_time = cursor.fetchone()
         assert status == "done"
         assert metadata == '{"output": "/path/to/file.png"}'
@@ -346,7 +346,7 @@ class TestCompleteJob:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT status, retries_attempted, error_trace FROM jobs WHERE id=?",
+            "SELECT status, retries_attempted, error_trace FROM comfyui_jobs WHERE id=?",
             (job_id,)
         )
         status, retries, error = cursor.fetchone()
@@ -381,7 +381,7 @@ class TestCompleteJob:
         # Assert
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT status, error_trace FROM jobs WHERE id=?", (job_id,))
+        cursor.execute("SELECT status, error_trace FROM comfyui_jobs WHERE id=?", (job_id,))
         status, error = cursor.fetchone()
         assert status == "failed"
         assert error == "Final failure"
@@ -402,7 +402,7 @@ class TestRecoverOrphans:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO jobs (config_name, job_type, workflow_id, priority, status,
+            INSERT INTO comfyui_jobs (config_name, job_type, workflow_id, priority, status,
                             worker_id, lease_expires_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, ("job.yaml", "T2I", "wf", 50, "processing", "worker1", past_time))
@@ -416,7 +416,7 @@ class TestRecoverOrphans:
         assert recovered == 1
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT status, worker_id FROM jobs WHERE config_name=?", ("job.yaml",))
+        cursor.execute("SELECT status, worker_id FROM comfyui_jobs WHERE config_name=?", ("job.yaml",))
         status, worker_id = cursor.fetchone()
         assert status == "pending"
         assert worker_id is None
@@ -433,7 +433,7 @@ class TestRecoverOrphans:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO jobs (config_name, job_type, workflow_id, priority, status,
+            INSERT INTO comfyui_jobs (config_name, job_type, workflow_id, priority, status,
                             worker_id, lease_expires_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, ("job.yaml", "T2I", "wf", 50, "processing", "worker1", future_time))

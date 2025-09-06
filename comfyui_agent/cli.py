@@ -283,7 +283,7 @@ def retry(
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            UPDATE jobs
+            UPDATE comfyui_jobs
             SET status = 'pending',
                 error_trace = NULL
             WHERE config_name = ?

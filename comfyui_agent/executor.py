@@ -441,7 +441,7 @@ def run_once(cfg: Dict[str, Any], workflows: Dict[str, Any],
     
     # Only show detailed job list in debug mode
     if logger.isEnabledFor(10):  # DEBUG level
-        cursor.execute("SELECT id, config_name, status, retries_attempted, retry_limit FROM jobs")
+        cursor.execute("SELECT id, config_name, status, retries_attempted, retry_limit FROM comfyui_jobs")
         all_jobs = cursor.fetchall()
         
         if all_jobs:
@@ -451,7 +451,7 @@ def run_once(cfg: Dict[str, Any], workflows: Dict[str, Any],
         else:
             logger.debug(f"[EXECUTOR] No jobs in database")
     
-    cursor.execute("SELECT COUNT(*) FROM jobs WHERE status='pending'")
+    cursor.execute("SELECT COUNT(*) FROM comfyui_jobs WHERE status='pending'")
     pending_count = cursor.fetchone()[0]
     
     # Only log if there are pending jobs
