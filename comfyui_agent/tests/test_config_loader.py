@@ -58,8 +58,8 @@ class TestLoadGlobalConfig:
         config_file = tmp_path / "config.yaml"
         config_data = {
             "paths": {
-                "jobs_processing": "jobs/processing",
-                "jobs_finished": "jobs/finished",
+                "jobs_processing": "comfyui_jobs/processing",
+                "jobs_finished": "comfyui_jobs/finished",
                 "database": "database/comfyui_agent.db"
             },
             "comfyui": {
@@ -108,8 +108,8 @@ class TestLoadGlobalConfig:
         config_file = tmp_path / "config.yaml"
         config_data = {
             "paths": {
-                "jobs_processing": "jobs/processing",
-                "jobs_finished": "jobs/finished",
+                "jobs_processing": "comfyui_jobs/processing",
+                "jobs_finished": "comfyui_jobs/finished",
                 "database": "database/comfyui_agent.db"
             }
         }

@@ -40,14 +40,14 @@ DEFAULT_CONFIG_PATH = "comfyui_agent/config/global_config.yaml"
 DEFAULT_WORKFLOWS_PATH = "comfyui_agent/config/workflows.yaml"
 
 
-def get_config_and_db(config_path: str = DEFAULT_CONFIG_PATH) -> tuple:
+def get_config_and_db(config_path: str = None) -> tuple:
     """Load configuration and initialize database.
     
     Returns:
         Tuple of (config, workflows, db_path).
     """
     try:
-        config = load_global_config(config_path)
+        config = load_global_config()  # Uses E3_ENV environment variable
         workflows = load_workflows(DEFAULT_WORKFLOWS_PATH) if os.path.exists(DEFAULT_WORKFLOWS_PATH) else {}
         db_path = config["paths"]["database"]
         
@@ -57,6 +57,7 @@ def get_config_and_db(config_path: str = DEFAULT_CONFIG_PATH) -> tuple:
         return config, workflows, db_path
     except Exception as e:
         console.print(f"[red]Error loading configuration: {e}[/red]")
+        console.print(f"[yellow]Make sure E3_ENV is set (alpha/prod) and run 'python initialize.py' first[/yellow]")
         sys.exit(1)
 
 
@@ -301,16 +302,16 @@ def init(
     # Create directory structure
     dirs = [
         "comfyui_agent/config",
-        "jobs/processing/image",
-        "jobs/processing/video",
-        "jobs/processing/audio",
-        "jobs/processing/speech",
-        "jobs/processing/3d",
-        "jobs/finished/image",
-        "jobs/finished/video",
-        "jobs/finished/audio",
-        "jobs/finished/speech",
-        "jobs/finished/3d",
+        "comfyui_jobs/processing/image",
+        "comfyui_jobs/processing/video",
+        "comfyui_jobs/processing/audio",
+        "comfyui_jobs/processing/speech",
+        "comfyui_jobs/processing/3d",
+        "comfyui_jobs/finished/image",
+        "comfyui_jobs/finished/video",
+        "comfyui_jobs/finished/audio",
+        "comfyui_jobs/finished/speech",
+        "comfyui_jobs/finished/3d",
         "database",
         "workflows"
     ]
@@ -328,8 +329,8 @@ retry_limit: 2
 poll_interval_ms: 1000
 
 paths:
-  jobs_processing: "jobs/processing"
-  jobs_finished: "jobs/finished"
+  jobs_processing: "comfyui_jobs/processing"
+  jobs_finished: "comfyui_jobs/finished"
   database: "database/comfyui_agent.db"
 
 comfyui:

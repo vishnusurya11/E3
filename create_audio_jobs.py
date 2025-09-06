@@ -6,9 +6,9 @@ import shutil
 import sys
 
 # Path configurations - where ComfyUI agent looks for new jobs
-JOBS_PROCESSING_PATH = "jobs/processing"  # Base path where agent monitors
+JOBS_PROCESSING_PATH = "comfyui_jobs/processing"  # Base path where agent monitors
 AUDIO_JOBS_DIR = os.path.join(JOBS_PROCESSING_PATH, "speech")  # Subfolder for audio jobs
-FINISHED_AUDIO_PATH = "jobs/finished/speech"  # Where finished audio files will be saved
+FINISHED_AUDIO_PATH = "comfyui_jobs/finished/speech"  # Where finished audio files will be saved
 
 def create_audio_jobs(chapter_key, sentences, chapter_title, timestamp, output_dir=AUDIO_JOBS_DIR):
     """Create individual YAML configs for each sentence

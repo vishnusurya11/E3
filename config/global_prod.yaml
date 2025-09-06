@@ -1,0 +1,43 @@
+# E3 Production Environment Configuration
+# Complete configuration for ComfyUI Agent and Audiobook Pipeline
+
+# Database Configuration
+databases:
+  comfyui: "database/comfyui_agent.db"
+  audiobook: "database/audiobook.db"
+
+# ComfyUI Job Processing Paths
+paths:
+  jobs_processing: "comfyui_jobs/processing"
+  jobs_finished: "comfyui_jobs/finished"
+
+# ComfyUI Service Configuration
+comfyui:
+  api_base_url: "http://${COMFYUI_HOST:-127.0.0.1}:${COMFYUI_PORT:-8000}"
+  timeout_seconds: 30000
+  retry_limit: 3  # More retries in production
+  default_priority: 50
+  poll_interval_ms: 1000
+
+# Audiobook Pipeline Configuration
+audiobook:
+  chunk_size: 1000
+  voice_models:
+    - "eleven_labs"
+    - "openai_tts"
+  output_format: "mp3"
+  narrator_samples_path: "audio_samples"
+  foundry:
+    input_path: "foundry/input"
+    processing_path: "foundry/processing"
+    finished_path: "foundry/finished"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "logs/e3_prod.log"
+
+# Environment Metadata
+environment:
+  name: "production"
+  description: "Production environment"

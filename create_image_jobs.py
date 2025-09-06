@@ -204,7 +204,7 @@ def process_book_image_prompts(
 def create_image_jobs_for_book(
     book_id: str,
     base_input_dir: str = "foundry/processing",
-    base_jobs_dir: str = "jobs",  # Fixed: Use correct ComfyUI jobs directory
+    base_jobs_dir: str = "comfyui_jobs",  # Fixed: Use correct ComfyUI jobs directory
     base_output_dir: str = "foundry/finished",
     workflow_template: str = None,
     verbose: bool = True

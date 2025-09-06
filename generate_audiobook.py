@@ -147,8 +147,8 @@ def generate_audio_jobs_for_book(book_dict: Dict, processing_dir: str) -> bool:
         return False
     
     # Output: jobs/processing/speech/ (regular jobs path)
-    jobs_output_dir = "jobs/processing/speech"
-    finished_audio_dir = "jobs/finished/speech"
+    jobs_output_dir = "comfyui_jobs/processing/speech"
+    finished_audio_dir = "comfyui_jobs/finished/speech"
     
     log_simple(book_id, f"Starting audio job generation for '{book_title}'", 'INFO', 'audio_jobs_start')
     
@@ -918,7 +918,7 @@ def create_image_jobs_for_book_pipeline(book_dict: Dict) -> bool:
         
         if result['success']:
             # VALIDATION: Verify job files actually exist before marking complete
-            jobs_dir = "jobs/processing"
+            jobs_dir = "comfyui_jobs/processing"
             clean_book_id = book_id.replace('-images', '')
             expected_jobs = result['total_jobs_created']
             

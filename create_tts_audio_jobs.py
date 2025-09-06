@@ -163,8 +163,8 @@ def process_book(book_path: Path, jobs_output_dir: str, finished_audio_dir: str,
 def create_tts_jobs(
     input_dir: str = "output",
     input_book_dir: str = None,
-    jobs_output_dir: str = "jobs/processing/speech",
-    finished_audio_dir: str = "jobs/finished/speech",
+    jobs_output_dir: str = "comfyui_jobs/processing/speech",
+    finished_audio_dir: str = "comfyui_jobs/finished/speech",
     voice_sample: str = None,
     book_filter: str = None,
     verbose: bool = True
@@ -321,8 +321,8 @@ def main(book_filter: Optional[str] = None):
     """CLI wrapper for create_tts_jobs function."""
     # Default paths for CLI usage
     default_input_dir = "output"
-    default_jobs_dir = "jobs/processing/speech"
-    default_finished_dir = "jobs/finished/speech"
+    default_jobs_dir = "comfyui_jobs/processing/speech"
+    default_finished_dir = "comfyui_jobs/finished/speech"
     input_book_dir = r"D:\Projects\pheonix\prod\E3\E3\output\pg61262-images"
     result = create_tts_jobs(
         input_book_dir=input_book_dir,

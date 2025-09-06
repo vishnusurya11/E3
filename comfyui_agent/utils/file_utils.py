@@ -47,8 +47,8 @@ def list_yaml_under(root: str, *, media_types: Optional[List[str]] = None) -> Li
         List of absolute file paths to YAML files.
         
     Examples:
-        >>> files = list_yaml_under("/jobs/processing")
-        >>> files = list_yaml_under("/jobs", media_types=["image", "video"])
+        >>> files = list_yaml_under("/comfyui_jobs/processing")
+        >>> files = list_yaml_under("/comfyui_jobs", media_types=["image", "video"])
     """
     if not os.path.exists(root):
         return []
@@ -89,7 +89,7 @@ def safe_move(src: str, dst: str) -> None:
         FileNotFoundError: If source file doesn't exist.
         
     Examples:
-        >>> safe_move("/tmp/job.yaml", "/jobs/finished/job.yaml")
+        >>> safe_move("/tmp/job.yaml", "/comfyui_jobs/finished/job.yaml")
     """
     if not os.path.exists(src):
         raise FileNotFoundError(f"Source file not found: {src}")

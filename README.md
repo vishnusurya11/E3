@@ -8,6 +8,43 @@ Monitors folders for YAML configs → Queues in SQLite → Executes via ComfyUI 
 - Web ui  running at http://127.0.0.1:8080
 - uv package manager: `pip install uv`
 
+## Environment Configuration
+
+E3 uses a clean, centralized configuration system supporting multiple environments:
+
+### **Configuration Structure**
+```
+E3/
+├── .env                    # Infrastructure settings (API keys, hosts)
+├── config/
+│   ├── global_alpha.yaml  # Alpha environment config  
+│   └── global_prod.yaml   # Production environment config
+├── comfyui_jobs/           # ComfyUI Agent job processing
+│   ├── processing/         # Input job files (YAML configs)
+│   └── finished/           # Generated outputs
+├── foundry/                # Audiobook pipeline
+│   ├── input/              # Book input files  
+│   ├── processing/         # Work in progress
+│   └── finished/           # Completed audiobooks
+└── initialize.py           # Environment setup script
+```
+
+### **Setup Steps**
+1. Copy `.env.example` to `.env`
+2. Set `E3_ENV=alpha` for development or `E3_ENV=prod` for production  
+3. Run `python initialize.py` - automatically uses correct config and database
+
+### **Environment Differences**
+- **Alpha**: `database/alpha_comfyui_agent.db`, `logs/e3_alpha.log`
+- **Production**: `database/comfyui_agent.db`, `logs/e3_prod.log`
+- **Cross-platform**: Works on Windows, Linux, Mac, and EC2
+- **Clean separation**: `comfyui_jobs/` for ComfyUI agent, `foundry/` for audiobooks
+
+### **Configuration Philosophy**
+- **`.env`** = Infrastructure (API keys, hosts, ports) - what changes between deployments
+- **`config/global_*.yaml`** = Application logic (timeouts, paths, settings) - what stays consistent
+- **Environment interpolation**: `api_base_url: "http://${COMFYUI_HOST}:${COMFYUI_PORT}"`
+
 ## Windows Setup (Command Prompt)
 ```cmd
 # 1. Clean up old venv if exists
@@ -25,8 +62,8 @@ uv pip install -r requirements.txt
 # 5. Install package
 uv pip install -e .
 
-# 6. Initialize database
-python -c "from comfyui_agent.db_manager import init_db; init_db('database/comfyui_agent.db')"
+# 6. Initialize environment and database
+python initialize.py
 ```
 
 ## Linux/WSL Setup
@@ -35,7 +72,7 @@ python -c "from comfyui_agent.db_manager import init_db; init_db('database/comfy
 uv venv && source .venv/bin/activate
 uv pip install -r requirements.txt
 uv pip install -e .
-python -c "from comfyui_agent.db_manager import init_db; init_db('database/comfyui_agent.db')"
+python initialize.py
 ```
 
 ## Start ComfyUI (Required)
@@ -52,7 +89,7 @@ python main.py --port 8000
 .venv\Scripts\activate
 
 # Start all services:
-python -m comfyui_agent.cli start --ui-port 8080
+python -m comfyui_agent.cli start --ui-port 8081
 
 # Or run separately:
 python -m comfyui_agent.cli monitor    # Terminal 1: Monitor
@@ -71,19 +108,19 @@ Copy a sample YAML to processing folder:
 
 **Windows:**
 ```cmd
-copy samples\test_job_t2i.yaml jobs\processing\image\
+copy samples\test_job_t2i.yaml comfyui_jobs\processing\image\
 ```
 
 **Linux/WSL:**
 ```bash
-cp samples/test_job_t2i.yaml jobs/processing/image/
+cp samples/test_job_t2i.yaml comfyui_jobs/processing/image/
 ```
 
 The system will automatically:
 1. Detect the file
 2. Queue it in database
 3. Send to ComfyUI
-4. Save output to `jobs/finished/image/`
+4. Save output to `comfyui_jobs/finished/image/`
 
 ## Web UI
 Open http://localhost:8080 to:

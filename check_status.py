@@ -77,7 +77,7 @@ def check_comfyui(url='http://127.0.0.1:8000'):
     
     return False
 
-def check_yaml_files(processing_dir='jobs/processing'):
+def check_yaml_files(processing_dir='comfyui_jobs/processing'):
     """Check for YAML files in processing directory."""
     print(f"\n=== YAML FILES ===")
     

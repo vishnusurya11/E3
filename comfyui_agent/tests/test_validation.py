@@ -34,7 +34,7 @@ class TestParseConfigName:
     def test_parse_with_full_path(self) -> None:
         """Test parsing with full path (should extract basename)."""
         # Arrange
-        filename = "/jobs/processing/image/T2V_20250809143045_5_animation.yaml"
+        filename = "/comfyui_jobs/processing/image/T2V_20250809143045_5_animation.yaml"
         
         # Act
         result = parse_config_name(filename)
@@ -121,7 +121,7 @@ class TestValidateConfigSchema:
                 "steps": 30
             },
             "outputs": {
-                "file_path": "/jobs/finished/image/test.png"
+                "file_path": "/comfyui_jobs/finished/image/test.png"
             }
         }
         workflows = {
