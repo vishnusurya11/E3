@@ -1,30 +1,3 @@
-# Python Developer Context
-
-You are an experienced Python developer building a scalable audiobook generation application. 
-
-## Development Principles
-- Write clean, type-hinted Python 3.11+ code
-- Follow PEP 8 and best practices
-- Use async/await for I/O operations
-- Implement proper error handling and logging
-- Create modular, testable code with clear separation of concerns
-- Use descriptive names and add docstrings
-- Think about edge cases and performance
-- Prefer composition over inheritance
-- Use design patterns where appropriate (Strategy, Factory, etc.)
-
-## Code Style
-- Type hints for all function parameters and returns
-- Proper exception handling with specific exceptions
-- Logging instead of print statements
-- Small, focused functions
-- Abstract base classes for extensibility
-- Dependency injection for testability
-
-When I describe features or requirements, implement them following these principles. Always think about maintainability, scalability, and code quality.
-
-
-
 ## Audiobook Generation System - Database & File Structure Requirements
 
 ### Database Schema
@@ -278,4 +251,146 @@ foundry/{book_id}/{language}/chapters/
 - HTML file not found
 - Parse failure (no chapters detected)
 - File write errors
-- Update event: STEP1_parsing → 'failed' 
+- Update event: STEP1_parsing → 'failed'
+
+---
+
+## STEP 2: Add Book Metadata to First Chunk
+
+### Purpose
+Enhance the first audio chunk with book introduction metadata for professional audiobook presentation.
+
+### Logic
+```python
+# 1. Load chapter_001.json from foundry/{book_id}/{language}/chapters/
+# 2. Extract first chunk text from first chapter
+# 3. Prepend book metadata: "{book_name} by {author}, narrated by {narrator_name}, "
+# 4. Update chunk text and char_count
+# 5. Save modified chapter_001.json
+```
+
+### Input Requirements
+- Completed STEP1_parsing (chapter_001.json exists)
+- Book metadata from audiobook_productions join (book_name, author, narrator_name)
+- Valid chapter structure with chunks array
+
+### Output Modification
+```json
+{
+  "chapter": {
+    "chunks": [
+      {
+        "chunk_id": 1,
+        "text": "The Adventures of Tom Sawyer by Mark Twain, narrated by Rowan Whitmore, [original first chunk text...]",
+        "char_count": 520  // Updated count
+      }
+    ]
+  }
+}
+```
+
+### Success Criteria
+- Locate first chapter JSON file successfully
+- Add metadata prefix to first chunk text
+- Update char_count with new text length
+- Save modified file without corruption
+- Update event: STEP2_metadata → 'success'
+- Queue next step: STEP3_create_audio_jobs → 'pending'
+
+### Error Conditions
+- chapter_001.json file not found
+- Invalid JSON structure (no chunks)
+- File write permission errors
+- Update event: STEP2_metadata → 'failed'
+
+---
+
+## STEP 3: Create TTS Audio Jobs
+
+### Purpose
+Convert parsed chapter JSON files into TTS job YAML configurations for ComfyUI processing.
+
+### Logic
+```python
+# 1. Read chapter JSON files from foundry/{book_id}/{language}/chapters/
+# 2. Extract text chunks for TTS processing
+# 3. Create YAML job configs using narrator voice sample
+# 4. Save job files to comfyui_jobs/processing/speech/
+# 5. Use create_tts_audio_jobs.create_tts_jobs() function
+```
+
+### Input Requirements
+- Completed STEP2_metadata (enhanced chapter JSON files)
+- Chapter files in foundry/{book_id}/{language}/chapters/
+- Narrator voice sample file path from audiobook_dict['sample_filepath']
+- Valid ComfyUI job output directories
+
+### Output Structure
+```
+comfyui_jobs/processing/speech/
+├── SPEECH_{book_id}_001.yaml    # TTS job for chunk 1
+├── SPEECH_{book_id}_002.yaml    # TTS job for chunk 2  
+└── ...                          # Job files for all chunks
+```
+
+### Success Criteria
+- Read all chapter JSON files successfully
+- Create TTS job YAML configs for all text chunks
+- Use correct narrator voice sample path
+- Save job files to ComfyUI processing directory
+- Update event: STEP3_create_audio_jobs → 'success'
+- Queue next step: STEP4_monitor_audio → 'pending'
+
+### Error Conditions
+- Chapter JSON files not found
+- Invalid chapter file structure
+- Voice sample file missing
+- Job file creation/write errors
+- Update event: STEP3_create_audio_jobs → 'failed' 
+
+---
+
+## STEP 4: Monitor and Move Audio Files
+
+### Purpose
+Monitor ComfyUI TTS job completion and move generated audio files to foundry directory structure.
+
+### Logic
+```python
+# 1. Query comfyui_jobs table for job status counts by book_id
+# 2. Check if all jobs are 'done' (no pending/processing jobs remaining)  
+# 3. If jobs still running: return "processing" and wait for next cycle
+# 4. If all done: move audio files from ComfyUI output to foundry/{book_id}/{language}/speech/
+# 5. Update event status accordingly
+```
+
+### Input Requirements
+- Completed STEP3_create_audio_jobs (TTS jobs created)
+- ComfyUI jobs in database with config_name containing book_id
+- ComfyUI output files in D:/Projects/pheonix/dev/output/speech/alpha/{book_id}*
+
+### Output Structure
+```
+foundry/{book_id}/{language}/speech/
+├── audio_file_001.wav    # Moved from ComfyUI output
+├── audio_file_002.wav    # Generated audio files
+└── ...                   # All completed audio files
+```
+
+### Success Criteria
+- Query ComfyUI job status successfully
+- All TTS jobs completed (status = 'done')
+- Audio files moved from ComfyUI output to foundry structure
+- Update event: STEP4_monitor_and_move_audio → 'success'
+- Queue next step: STEP5_combine_audio → 'pending'
+
+### Wait Conditions
+- Jobs still pending or processing
+- Log waiting status but don't update database
+- Return "processing" to indicate still waiting
+
+### Error Conditions  
+- No ComfyUI jobs found for book_id
+- All jobs failed with no successful completions
+- Audio file moving errors
+- Update event: STEP4_monitor_and_move_audio → 'failed'

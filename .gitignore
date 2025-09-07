@@ -26,3 +26,7 @@ archive*
 *.jpg
 audiobooks/*
 foundry/*
+database/*
+comfyui_jobs/*
+*.log
+*.db*

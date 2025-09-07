@@ -32,30 +32,22 @@ def get_all_books() -> List[Dict]:
     print("Getting all books from audiobook database...")
     
     try:
-        with get_db_connection() as conn:
+        db_path = get_normalized_db_path()
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
+            # Use new normalized schema with simple query for compatibility
             cursor.execute("""
-                SELECT id, book_id, book_title, author, narrated_by, input_file,
-                       narrator_audio,
-                       parse_novel_status, metadata_status, audio_generation_status, 
-                       audio_files_moved_status, audio_combination_planned_status,
-                       subtitle_generation_status, audio_combination_status, video_generation_status,
-                       parse_novel_completed_at, metadata_completed_at, audio_generation_completed_at,
-                       audio_files_moved_completed_at, audio_combination_planned_completed_at,
-                       subtitle_generation_completed_at, audio_combination_completed_at, video_generation_completed_at,
-                       created_at, updated_at, metadata,
-                       total_chapters, total_chunks, total_words,
-                       total_audio_files, audio_jobs_completed, audio_duration_seconds, audio_file_size_bytes,
-                       retry_count, max_retries,
-                       image_prompts_status, image_prompts_started_at, image_prompts_completed_at,
-                       image_jobs_generation_status, image_jobs_generation_completed_at,
-                       image_jobs_completed, total_image_jobs, image_generation_status, image_generation_completed_at
-                FROM audiobook_processing 
-                ORDER BY id
+                SELECT b.id, b.book_id, b.book_name as book_title, b.author,
+                       n.narrator_name as narrated_by,
+                       ap.status, ap.created_at, ap.updated_at
+                FROM books b
+                LEFT JOIN audiobook_productions ap ON b.book_id = ap.book_id
+                LEFT JOIN narrators n ON ap.narrator_id = n.narrator_id
+                ORDER BY b.id
             """)
             
-            columns = [desc[0] for desc in cursor.description]
-            books = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            books = [dict(row) for row in cursor.fetchall()]
             
             print(f"Found {len(books)} books in database")
             return books
@@ -524,6 +516,107 @@ def add_audiobook_event(audiobook_id: str, step_number: str, status: str) -> boo
             
     except Exception as e:
         print(f"❌ Error adding event: {e}")
+        return False
+
+
+def get_comfyui_job_status_by_book_id(book_id: str) -> Dict:
+    """
+    Get ComfyUI job status counts for a specific book_id.
+    
+    Queries comfyui_jobs table for jobs where config_name contains the book_id
+    and returns status counts as a dictionary.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        
+    Returns:
+        Dict: Status counts like {'done': 3, 'pending': 152, 'processing': 1}
+    """
+    try:
+        db_path = get_normalized_db_path()
+        
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Query job status counts for this book_id
+            cursor.execute("""
+                SELECT status, COUNT(*) as count
+                FROM comfyui_jobs 
+                WHERE config_name LIKE ?
+                GROUP BY status
+            """, (f'%{book_id}%',))
+            
+            results = cursor.fetchall()
+            
+            # Convert to dict
+            status_counts = {}
+            for row in results:
+                status_counts[row['status']] = row['count']
+            
+            print(f"📊 ComfyUI job status for {book_id}: {status_counts}")
+            return status_counts
+            
+    except Exception as e:
+        print(f"❌ Error getting ComfyUI job status for {book_id}: {e}")
+        return {}
+
+
+def move_comfyui_audio_files(book_id: str, language: str = 'eng') -> bool:
+    """
+    Move completed ComfyUI audio files from dev output to foundry speech directory.
+    
+    Moves files from D:/Projects/pheonix/dev/output/speech/alpha/{book_id}* 
+    to foundry/{book_id}/speech/
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (default: 'eng')
+        
+    Returns:
+        bool: True if files moved successfully
+    """
+    import glob
+    import shutil
+    import os
+    
+    # Source pattern - ComfyUI output directory
+    source_pattern = f"D:/Projects/pheonix/dev/output/speech/alpha/{book_id}*"
+    
+    # Destination directory 
+    dest_dir = f"foundry/{book_id}/{language}/speech"
+    
+    print(f"🔍 Looking for audio files: {source_pattern}")
+    
+    try:
+        # Find source files
+        source_files = glob.glob(source_pattern)
+        
+        if not source_files:
+            print(f"❌ No audio files found matching: {source_pattern}")
+            return False
+        
+        # Create destination directory
+        os.makedirs(dest_dir, exist_ok=True)
+        
+        # Move each file
+        moved_count = 0
+        for source_file in source_files:
+            filename = os.path.basename(source_file)
+            dest_path = os.path.join(dest_dir, filename)
+            
+            print(f"📁 Moving: {source_file} -> {dest_path}")
+            
+            # Use copy2 to preserve metadata, then remove source
+            shutil.copy2(source_file, dest_path)
+            os.remove(source_file)
+            moved_count += 1
+        
+        print(f"✅ Successfully moved {moved_count} audio files to {dest_dir}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error moving audio files: {e}")
         return False
 
 

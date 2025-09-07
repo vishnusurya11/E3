@@ -8,7 +8,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime
 
-from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk
+from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, move_comfyui_audio_files
 
 
 def setup_logging():
@@ -146,8 +146,40 @@ def main():
                 else:
                     add_audiobook_event(audiobook_id, 'STEP2_metadata', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP2_metadata", "FAILED", "Metadata addition execution failed")
+
+            elif current_step == 'STEP3_create_audio_jobs' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "STARTING", "TTS job creation execution initiated")
+                
+                success = execute_step3_create_audio_jobs(audiobook)  # Pass entire dict
+                
+                # Update event status based on result
+                if success:
+                    add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'pending')  
+                    
+                    log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "SUCCESS", "TTS jobs created - STEP4_monitor_and_move_audio queued")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "FAILED", "TTS job creation failed")
+
+            elif current_step == 'STEP4_monitor_and_move_audio' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "STARTING", "Audio monitoring and moving execution initiated")
+                
+                result = execute_step4_monitor_and_move_audio(audiobook, current_status)  # Pass current status instead of step
+                
+                # Update event status based on result
+                if result == True:
+                    add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "SUCCESS", "Audio monitoring and moving completed")
+                elif result == "processing":
+                    log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "WAITING", "ComfyUI jobs still processing - will check again next cycle")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "FAILED", "Audio monitoring and moving failed")
             
-            # TODO: Add other steps (STEP3, STEP4, etc.)
+            # TODO: Add other steps (STEP5, STEP6, etc.)
     
     timestamp = datetime.now().isoformat()
     print(f"{timestamp}|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished")
@@ -242,6 +274,120 @@ def execute_step2_metadata(audiobook_dict: dict) -> bool:
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP2_metadata", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+def execute_step3_create_audio_jobs(audiobook_dict: dict) -> bool:
+    """
+    ################################################################################
+    # STEP3_create_audio_jobs: Create TTS jobs for ComfyUI processing
+    #
+    # Purpose: Convert parsed chapter JSON files into TTS job YAML configs
+    # Input:   Complete audiobook dict with narrator voice sample
+    # Output:  TTS job files in comfyui_jobs/processing/speech/
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "PROCESSING", "TTS job creation started")
+    
+    try:
+        # Call create_tts_jobs function with our folder structure
+        from create_tts_audio_jobs import create_tts_jobs
+        
+        input_dir = f"foundry/{book_id}/{language}/chapters"  # Our chapter files
+        
+        log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "PROGRESS", f"Input dir: {input_dir} | Voice: {audiobook_dict['sample_filepath']}")
+        
+        result = create_tts_jobs(
+            input_book_dir=input_dir,
+            jobs_output_dir="comfyui_jobs/processing/speech",      # ComfyUI input
+            finished_audio_dir="comfyui_jobs/finished/speech",     # ComfyUI output  
+            voice_sample=audiobook_dict['sample_filepath'],        # Narrator voice
+            book_filter=book_id,
+            verbose=True,
+            audiobook_dict=audiobook_dict                          # NEW: Pass complete dict
+        )
+        
+        if result.get('success', False):
+            jobs_created = result.get('total_jobs_created', 0)
+            log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "SUCCESS", f"Created {jobs_created} TTS jobs for ComfyUI processing")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "ERROR", f"Job creation failed: {result.get('error', 'Unknown error')}")
+            return False
+            
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
+    """
+    ################################################################################
+    # STEP4_monitor_and_move_audio: Monitor TTS job completion and move audio files
+    #
+    # Purpose: Monitor ComfyUI TTS job completion and organize generated audio files
+    # Input:   Complete audiobook dict with book/narrator details
+    # Output:  Audio files organized in foundry/{book_id}/speech/
+    # Returns: "processing" if jobs still running, True if completed, False if failed
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    if current_step == "pending":
+        add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'processing')
+        log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "PROCESSING", "Audio monitoring and moving started")
+    
+    try:
+        # Check ComfyUI job status for this book
+        job_status = get_comfyui_job_status_by_book_id(book_id)
+        
+        if not job_status:
+            log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", "No ComfyUI jobs found for this book")
+            return False
+        
+        # Check if all jobs are done
+        pending_count = job_status.get('pending', 0)
+        processing_count = job_status.get('processing', 0) 
+        done_count = job_status.get('done', 0)
+        failed_count = job_status.get('failed', 0)
+        
+        log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "PROGRESS", 
+                     f"Job status - Done: {done_count}, Pending: {pending_count}, Processing: {processing_count}, Failed: {failed_count}")
+        
+        # If there are still pending or processing jobs, wait
+        if pending_count > 0 or processing_count > 0:
+            log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "WAITING", "ComfyUI jobs still in progress - waiting for completion")
+            return "processing"  # Special return value to indicate still processing
+        
+        # If there are failed jobs, report error
+        if failed_count > 0 and done_count == 0:
+            log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", f"{failed_count} jobs failed with no successful completions")
+            return False
+        
+        # All jobs are done - proceed with moving files
+        log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "PROGRESS", f"All {done_count} ComfyUI jobs completed - moving audio files")
+        
+        # Move audio files from ComfyUI output to foundry
+        success = move_comfyui_audio_files(book_id, language)
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "SUCCESS", "Audio files moved successfully to foundry speech directory")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", "Failed to move audio files")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", f"Exception: {str(e)}")
         return False
 
 
