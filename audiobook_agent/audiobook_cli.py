@@ -8,7 +8,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime
 
-from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, move_comfyui_audio_files
+from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, move_comfyui_audio_files, combine_audiobook_files
 
 
 def setup_logging():
@@ -172,14 +172,29 @@ def main():
                     add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'success')
                     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'pending')
                     
-                    log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "SUCCESS", "Audio monitoring and moving completed")
+                    log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "SUCCESS", "Audio monitoring and moving completed - STEP5_combine_audio queued")
                 elif result == "processing":
                     log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "WAITING", "ComfyUI jobs still processing - will check again next cycle")
                 else:
                     add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "FAILED", "Audio monitoring and moving failed")
+
+            elif current_step == 'STEP5_combine_audio' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "STARTING", "Audio combination execution initiated")
+                
+                success = execute_step5_combine_audio(audiobook)  # Pass entire dict
+                
+                # Update event status based on result
+                if success:
+                    add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", "Audio combination completed")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "FAILED", "Audio combination failed")
             
-            # TODO: Add other steps (STEP5, STEP6, etc.)
+            # TODO: Add other steps (STEP6, STEP7, etc.)
     
     timestamp = datetime.now().isoformat()
     print(f"{timestamp}|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished")
@@ -390,6 +405,43 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
         log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", f"Exception: {str(e)}")
         return False
 
+
+def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
+    """
+    ################################################################################
+    # STEP5_combine_audio: Combine individual audio files into complete audiobook
+    #
+    # Purpose: Combine chapter/chunk audio files into final audiobook files
+    # Input:   Audio files in foundry/{book_id}/{language}/speech/ with ch001/chunk001 structure
+    # Output:  Combined audio files in foundry/{book_id}/{language}/combined/
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "PROCESSING", "Audio combination started")
+    
+    try:
+        # Call helper function to combine audio files
+        success = combine_audiobook_files(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", "Audio combination completed successfully")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", "Audio combination failed")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", f"Exception: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     main()

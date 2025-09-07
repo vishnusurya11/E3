@@ -64,7 +64,7 @@ def extract_chunk_number(chunk_name):
     return 0
 
 def find_audio_file(chunk_folder):
-    """Find the audio file in a chunk folder"""
+    """Find the latest audio file in a chunk folder"""
     # Priority order for audio file patterns
     patterns = [
         "audio_*.flac",
@@ -78,7 +78,9 @@ def find_audio_file(chunk_folder):
     for pattern in patterns:
         audio_files = list(chunk_folder.glob(pattern))
         if audio_files:
-            return audio_files[0]
+            # Sort by modification time, newest first (most recent file)
+            audio_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+            return audio_files[0]  # Return the newest file
     
     return None
 
@@ -545,6 +547,76 @@ def combine_audio_for_book(
         if verbose:
             print(f"\n{error_msg}")
         return {'success': False, 'error': error_msg}
+
+
+def combine_audio_from_foundry(
+    book_id: str,
+    language: str = 'eng',
+    audiobook_dict: Dict = None,
+    chunk_gap_ms: int = 500,
+    chapter_gap_ms: int = 1000,
+    ffmpeg_path: str = "ffmpeg",
+    audio_format: str = "mp3",
+    audio_bitrate: str = "192k",
+    verbose: bool = True
+) -> Dict:
+    """
+    Combine audio files from foundry folder structure for audiobook pipeline.
+    
+    Adapted for foundry/{book_id}/{language}/speech/ structure with chapters and chunks.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (default: 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        chunk_gap_ms: Gap between chunks in milliseconds
+        chapter_gap_ms: Gap between chapters in milliseconds
+        ffmpeg_path: Path to ffmpeg executable
+        audio_format: Output audio format (mp3, flac, etc.)
+        audio_bitrate: Audio bitrate for compression
+        verbose: Whether to print progress messages
+        
+    Returns:
+        Dict with success status, output files, and metadata
+    """
+    # Set up paths for foundry structure
+    input_path = f"foundry/{book_id}/{language}/speech"
+    output_path = f"foundry/{book_id}/{language}/combined_audio"
+    
+    # Set up metadata sources for foundry structure
+    metadata_sources = [
+        f"foundry/{book_id}/{language}/chapters/metadata.json",  # Chapter metadata
+        f"foundry/{book_id}/metadata.json",  # Book metadata
+        f"foundry/{book_id}/{language}/chapters/chapter_001.json"  # First chapter for fallback
+    ]
+    
+    if verbose:
+        print(f"🎵 Combining audio for {book_id} ({language}) using foundry structure")
+        print(f"📁 Input: {input_path}")
+        print(f"📁 Output: {output_path}")
+    
+    # Call the main combine function with foundry-specific parameters
+    result = combine_audio_for_book(
+        book_id=book_id,
+        input_path=input_path,
+        output_path=output_path,
+        combination_plan=None,  # Single file for now
+        metadata_sources=metadata_sources,
+        chunk_gap_ms=chunk_gap_ms,
+        chapter_gap_ms=chapter_gap_ms,
+        ffmpeg_path=ffmpeg_path,
+        audio_format=audio_format,
+        audio_bitrate=audio_bitrate,
+        verbose=verbose
+    )
+    
+    if verbose:
+        if result['success']:
+            print(f"✅ Audio combination completed successfully for {book_id}")
+        else:
+            print(f"❌ Audio combination failed for {book_id}: {result.get('error', 'Unknown error')}")
+    
+    return result
 
 
 def main():
