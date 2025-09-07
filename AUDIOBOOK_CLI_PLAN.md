@@ -394,3 +394,303 @@ foundry/{book_id}/{language}/speech/
 - All jobs failed with no successful completions
 - Audio file moving errors
 - Update event: STEP4_monitor_and_move_audio → 'failed'
+
+---
+
+## STEP 5: Plan and Combine Audio Files
+
+### Purpose
+Two-phase process: 1) Analyze total duration and create optimal combination plan, 2) Execute audio combination based on the plan.
+
+### Logic
+```python
+# Phase 1: Planning
+# 1. Analyze individual chapter audio files for duration using ffprobe
+# 2. Calculate total audiobook duration 
+# 3. If > 10 hours: Create multi-part plan with smart chapter distribution
+# 4. If ≤ 10 hours: Create single-part plan
+
+# Phase 2: Combination
+# 5. Access audio files in foundry/{book_id}/{language}/speech/ folder structure
+# 6. Use ffmpeg to combine chunks within each chapter sequentially 
+# 7. Combine chapters into final audiobook file(s) according to the plan
+# 8. Generate YouTube timestamps and metadata files
+```
+
+### Input Requirements
+- Completed STEP4_monitor_and_move_audio (audio files in foundry structure)
+- Audio files in `foundry/{book_id}/{language}/speech/ch001/chunk001/audio_*.flac`
+- Chapter metadata from STEP1 parsing in `foundry/{book_id}/{language}/chapters/`
+- ffmpeg and ffprobe installed and accessible in system PATH
+
+### Output Structure
+```
+foundry/{book_id}/{language}/combined_audio/
+├── chapters/
+│   ├── chapter_001.mp3           # Individual chapter files
+│   ├── chapter_002.mp3
+│   └── ...
+├── {book_id}_full_book.mp3       # Single file (if ≤ 10h)
+OR
+├── {book_id}_part1.mp3           # Multi-part files (if > 10h)
+├── {book_id}_part2.mp3
+├── youtube_timestamps_part1.txt  # YouTube chapter timestamps
+├── chapter_info_part1.json       # Chapter metadata JSON
+└── ...
+```
+
+### Success Criteria
+- Duration analysis completed successfully
+- Optimal combination plan created (single vs multi-part)
+- All chapter folders processed successfully
+- Individual chapter audio files created
+- Final audiobook file(s) generated according to plan
+- YouTube timestamps and metadata files created
+- Update event: STEP5_combine_audio → 'success'
+- Queue next step: STEP6_generate_subtitles → 'pending'
+
+### Error Conditions
+- Duration analysis fails (ffprobe errors)
+- No audio files found in speech directory
+- ffmpeg not installed or not accessible
+- Audio file corruption or format issues
+- Insufficient disk space for output files
+- Update event: STEP5_combine_audio → 'failed'
+
+---
+
+## STEP 6: Generate Subtitles
+
+### Purpose
+Generate SRT subtitle files for audiobook parts based on combination plan and audio timing.
+
+### Logic
+```python
+# 1. Read combination_plan.json to know which chapters belong to which parts
+# 2. For each part, generate subtitles using text chunks and audio timing
+# 3. Create SRT files matching the audio structure (single or multi-part)
+# 4. Update combination_plan.json with subtitle file paths
+```
+
+### Input Requirements
+- Completed STEP5_combine_audio (combination plan and chapter structure)
+- combination_plan.json with audio paths and part information
+- Text chunks from STEP1 parsing in foundry/{book_id}/{language}/chapters/
+- Audio files with timing information
+
+### Output Structure
+```
+foundry/{book_id}/{language}/subtitles/
+├── {book_id}_full_book.srt       # Single part subtitle
+OR
+├── {book_id}_part1.srt           # Multi-part subtitles
+├── {book_id}_part2.srt
+└── ...
+```
+
+### Success Criteria
+- Read combination plan successfully
+- Generate accurate SRT timing for each part
+- Create subtitle files matching audio part structure
+- Update combination_plan.json with subtitle_path for each part
+- Update event: STEP6_generate_subtitles → 'success'
+- Queue next step: STEP7_generate_image_prompts → 'pending'
+
+### Error Conditions
+- combination_plan.json not found
+- Subtitle generation function errors
+- File write permission errors
+- Update event: STEP6_generate_subtitles → 'failed'
+
+---
+
+## STEP 7: Generate Image Prompts
+
+### Purpose
+Generate AI image prompts for audiobook thumbnail creation, handling both single and multi-part scenarios.
+
+### Logic
+```python
+# 1. Read combination_plan.json to understand part structure
+# 2. Generate cinematic image prompts for each audiobook part
+# 3. For multi-part: include part information in prompts
+# 4. Save image prompts to foundry structure
+# 5. Update combination_plan.json with image prompt file paths
+```
+
+### Input Requirements
+- Completed STEP6_generate_subtitles (combination plan with subtitle paths)
+- combination_plan.json with part and chapter information
+- Book metadata (title, author, narrator) for prompt context
+- Access to AI prompt generation models
+
+### Output Structure
+```
+foundry/{book_id}/{language}/image_prompts/
+├── {book_id}_prompts.json        # Single part prompts
+OR
+├── {book_id}_part1_prompts.json  # Multi-part prompts
+├── {book_id}_part2_prompts.json
+└── ...
+```
+
+### Success Criteria
+- Read combination plan successfully
+- Generate 5+ high-quality image prompts per part
+- Handle part-specific titles for multi-part books
+- Save prompts in foundry structure
+- Update combination_plan.json with image_prompts_path for each part
+- Update event: STEP7_generate_image_prompts → 'success'
+- Queue next step: STEP8_create_image_jobs → 'pending'
+
+### Error Conditions
+- combination_plan.json not found
+- AI model access errors
+- Image prompt generation failures
+- File write permission errors
+- Update event: STEP7_generate_image_prompts → 'failed'
+
+---
+
+## STEP 8: Create Image Jobs
+
+### Purpose
+Convert image prompts into ComfyUI job configurations for image generation processing.
+
+### Logic
+```python
+# 1. Read combination_plan.json and image prompt files
+# 2. For each part, read generated image prompts
+# 3. Create ComfyUI YAML job files for each prompt
+# 4. Organize jobs in comfyui_jobs/processing/image/ directory
+# 5. Configure correct output paths with environment (alpha)
+```
+
+### Input Requirements
+- Completed STEP7_generate_image_prompts (image prompt files)
+- Image prompts in foundry/{book_id}/{language}/image_prompts/
+- ComfyUI workflow template (workflows/image_qwen_image.json)
+- Access to ComfyUI job processing directories
+
+### Output Structure
+```
+comfyui_jobs/processing/image/
+├── T2I_{book_id}_1_prompt001.yaml    # Image job for part 1, prompt 1
+├── T2I_{book_id}_1_prompt002.yaml    # Image job for part 1, prompt 2
+├── T2I_{book_id}_2_prompt001.yaml    # Multi-part: part 2 jobs
+└── ...
+
+# Output path in jobs: images/alpha/{book_id}/part1/prompt1
+```
+
+### Success Criteria
+- Read combination plan and image prompts successfully
+- Create ComfyUI job YAML files for all prompts
+- Jobs organized in /image subfolder for proper ComfyUI processing
+- Configure correct output paths with environment (alpha)
+- Update event: STEP8_create_image_jobs → 'success'
+- Queue next step: STEP9_monitor_and_move_images → 'pending'
+
+### Error Conditions
+- Image prompt files not found
+- ComfyUI workflow template missing
+- Job file creation/write errors
+- Update event: STEP8_create_image_jobs → 'failed'
+
+---
+
+## STEP 9: Monitor and Move Images
+
+### Purpose
+Monitor ComfyUI image job completion and move generated images to foundry structure.
+
+### Logic
+```python
+# 1. Query comfyui_jobs table for T2I_{book_id} job status counts
+# 2. Check if all image jobs are 'done' (no pending/processing jobs remaining)  
+# 3. If jobs still running: return "processing" and wait for next cycle
+# 4. If all done: move images from ComfyUI output to foundry/{book_id}/{language}/images/
+# 5. Update event status accordingly
+```
+
+### Input Requirements
+- Completed STEP8_create_image_jobs (ComfyUI image jobs created)
+- ComfyUI jobs in database with config_name matching T2I_{book_id} pattern
+- ComfyUI output files in D:/Projects/pheonix/dev/output/images/alpha/{book_id}/
+
+### Output Structure
+```
+foundry/{book_id}/{language}/images/
+├── part1/
+│   ├── prompt1_00001_.png        # Moved from ComfyUI output
+│   ├── prompt2_00001_.png        # Generated image files
+│   └── ...
+├── part2/                        # Multi-part: additional part folders
+└── ...
+```
+
+### Success Criteria
+- Query ComfyUI image job status successfully (T2I pattern)
+- All image generation jobs completed (status = 'done')
+- Image files moved from ComfyUI output to foundry structure
+- Update event: STEP9_monitor_and_move_images → 'success'
+- Queue next step: STEP10_select_image → 'pending'
+
+### Wait Conditions
+- Jobs still pending or processing
+- Log waiting status but don't update database
+- Return "processing" to indicate still waiting
+
+### Error Conditions  
+- No ComfyUI image jobs found for book_id
+- All jobs failed with no successful completions
+- Image file moving errors
+- Update event: STEP9_monitor_and_move_images → 'failed'
+
+---
+
+## STEP 10: Select Images
+
+### Purpose
+Select one thumbnail image per audiobook part for video generation from generated images.
+
+### Logic
+```python
+# 1. Read combination_plan.json to understand part structure
+# 2. For each part, scan foundry/{book_id}/{language}/images/part{X}/ directory
+# 3. Randomly select one image file per part (future: ML-based selection)
+# 4. Update combination_plan.json with selected_image_path for each part
+```
+
+### Input Requirements
+- Completed STEP9_monitor_and_move_images (images in foundry structure)
+- Images organized in foundry/{book_id}/{language}/images/part{X}/ directories
+- combination_plan.json with part structure information
+
+### Output Updates
+```json
+// Updated combination_plan.json
+"combinations": [
+  {
+    "part": 1,
+    "audio_path": "foundry/{book_id}/{language}/combined_audio/{book_id}_part1.mp3",
+    "subtitle_path": "foundry/{book_id}/{language}/subtitles/{book_id}_part1.srt",
+    "image_prompts_path": "foundry/{book_id}/{language}/image_prompts/{book_id}_part1_prompts.json",
+    "selected_image_path": "foundry/{book_id}/{language}/images/part1/prompt3_00001_.png"
+  }
+]
+```
+
+### Success Criteria
+- Read combination plan and locate image directories successfully
+- Select one image per part (random selection for now)
+- Update combination_plan.json with selected_image_path fields
+- Handle both single-part and multi-part scenarios
+- Update event: STEP10_select_image → 'success'
+- Queue next step: STEP11_generate_video → 'pending'
+
+### Error Conditions
+- No images found in part directories
+- combination_plan.json read/write errors
+- Random selection function errors
+- Update event: STEP10_select_image → 'failed'

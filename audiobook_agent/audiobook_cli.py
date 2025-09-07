@@ -8,7 +8,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime
 
-from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, move_comfyui_audio_files, combine_audiobook_files
+from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, get_comfyui_audio_job_status, get_comfyui_image_job_status, move_comfyui_audio_files, move_comfyui_image_files, combine_audiobook_files, plan_audio_combinations, generate_subtitles_for_audiobook, generate_image_prompts_for_audiobook, create_image_jobs_for_audiobook, select_images_for_audiobook
 
 
 def setup_logging():
@@ -76,7 +76,7 @@ def main():
         
         for record in queue:
             log_and_print(record['audiobook_id'], record['book_id'], "STEP0_queue", "INFO", 
-                         f"Book: {record['book_name']} by {record['author']} - Status: {record['status']}")
+                         f"Book: {record['book_name']} by {record['author']}")
     else:
         timestamp = datetime.now().isoformat()
         print(f"{timestamp}|SYSTEM|STEP0_queue|SUCCESS|No productions need processing - All complete")
@@ -189,12 +189,89 @@ def main():
                     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'success')
                     add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'pending')
                     
-                    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", "Audio combination completed")
+                    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", "Audio planning and combination completed")
                 else:
                     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "FAILED", "Audio combination failed")
+
+            elif current_step == 'STEP6_generate_subtitles' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "STARTING", "Subtitle generation execution initiated")
+                
+                success = execute_step6_generate_subtitles(audiobook)  # Pass entire dict
+                
+                # Update event status based on result
+                if success:
+                    add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "SUCCESS", "Subtitle generation completed")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "FAILED", "Subtitle generation failed")
+
+            elif current_step == 'STEP7_generate_image_prompts' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "STARTING", "Image prompt generation execution initiated")
+                
+                success = execute_step7_generate_image_prompts(audiobook)  # Pass entire dict
+                
+                # Update event status based on result
+                if success:
+                    add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "SUCCESS", "Image prompt generation completed")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "FAILED", "Image prompt generation failed")
+
+            elif current_step == 'STEP8_create_image_jobs' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "STARTING", "Image job creation execution initiated")
+                
+                success = execute_step8_create_image_jobs(audiobook)  # Pass entire dict
+                
+                # Update event status based on result
+                if success:
+                    add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "SUCCESS", "Image job creation completed")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "FAILED", "Image job creation failed")
+
+            elif current_step == 'STEP9_monitor_and_move_images' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "STARTING", "Image monitoring and moving execution initiated")
+                
+                result = execute_step9_monitor_and_move_images(audiobook, current_status)  # Pass current status
+                
+                # Update event status based on result
+                if result == True:
+                    add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP10_select_image', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "SUCCESS", "Image monitoring and moving completed")
+                elif result == "processing":
+                    log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "WAITING", "ComfyUI image jobs still processing - will check again next cycle")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "FAILED", "Image monitoring and moving failed")
+
+            elif current_step == 'STEP10_select_image' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP10_select_image", "STARTING", "Image selection execution initiated")
+                
+                success = execute_step10_select_images(audiobook)  # Pass entire dict
+                
+                # Update event status based on result
+                if success:
+                    add_audiobook_event(audiobook_id, 'STEP10_select_image', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP11_generate_video', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP10_select_image", "SUCCESS", "Image selection completed")
+                else:
+                    add_audiobook_event(audiobook_id, 'STEP10_select_image', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP10_select_image", "FAILED", "Image selection failed")
             
-            # TODO: Add other steps (STEP6, STEP7, etc.)
+            # TODO: Add other steps (STEP11, STEP12, etc.)
     
     timestamp = datetime.now().isoformat()
     print(f"{timestamp}|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished")
@@ -362,8 +439,8 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
         log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "PROCESSING", "Audio monitoring and moving started")
     
     try:
-        # Check ComfyUI job status for this book
-        job_status = get_comfyui_job_status_by_book_id(book_id)
+        # Check ComfyUI audio job status for this book
+        job_status = get_comfyui_audio_job_status(book_id)
         
         if not job_status:
             log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", "No ComfyUI jobs found for this book")
@@ -409,11 +486,12 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
 def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
     """
     ################################################################################
-    # STEP5_combine_audio: Combine individual audio files into complete audiobook
+    # STEP5_combine_audio: Plan and combine audio files into final audiobook
     #
-    # Purpose: Combine chapter/chunk audio files into final audiobook files
-    # Input:   Audio files in foundry/{book_id}/{language}/speech/ with ch001/chunk001 structure
-    # Output:  Combined audio files in foundry/{book_id}/{language}/combined/
+    # Purpose: 1) Analyze duration and create combination plan (parts/chapters)
+    #          2) Combine audio files based on the plan
+    # Input:   Audio files in foundry/{book_id}/{language}/speech/ with ch001/chunk001 structure  
+    # Output:  Final audiobook files in foundry/{book_id}/{language}/combined_audio/
     ################################################################################
     """
     book_id = audiobook_dict['book_id']
@@ -422,26 +500,291 @@ def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'processing')
-    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "PROCESSING", "Audio combination started")
+    log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "PROCESSING", "Audio planning and combination started")
     
     try:
-        # Call helper function to combine audio files
+        # Phase 1: Create combination plan
+        log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "PLANNING", "Creating audio combination plan")
+        
+        combination_plan = plan_audio_combinations(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if not combination_plan.get('success', False):
+            error_msg = combination_plan.get('error', 'Planning failed')
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", f"Planning phase failed: {error_msg}")
+            return False
+        
+        # Log planning results
+        parts_needed = combination_plan.get('parts_needed', 1)
+        total_hours = combination_plan.get('total_duration_hours', 0)
+        
+        if combination_plan.get('exceeds_limit', False):
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "PLANNED", 
+                         f"Multi-part plan: {parts_needed} parts for {total_hours:.2f}h audiobook")
+        else:
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "PLANNED", 
+                         f"Single part plan: {total_hours:.2f}h audiobook")
+        
+        # Save combination plan to file for future steps
+        try:
+            import json
+            import os
+            plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+            os.makedirs(os.path.dirname(plan_file), exist_ok=True)
+            
+            with open(plan_file, 'w', encoding='utf-8') as f:
+                json.dump(combination_plan, f, indent=2, ensure_ascii=False)
+            
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SAVED", f"Combination plan saved to {plan_file}")
+        except Exception as e:
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "WARNING", f"Failed to save combination plan: {e}")
+        
+        # Phase 2: Execute combination using the plan
+        log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "COMBINING", "Executing audio combination with plan")
+        
         success = combine_audiobook_files(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict,
+            combination_plan=combination_plan  # Pass the plan to combination
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", 
+                         f"Audio planning and combination completed - {parts_needed} parts created")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", "Audio combination phase failed")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+def execute_step6_generate_subtitles(audiobook_dict: dict) -> bool:
+    """
+    ################################################################################
+    # STEP6_generate_subtitles: Generate subtitle files for audiobook parts
+    #
+    # Purpose: Read combination plan and generate subtitles for each part
+    # Input:   combination_plan.json and audio files from STEP5
+    # Output:  Subtitle files and updated combination plan with subtitle paths
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "PROCESSING", "Subtitle generation started")
+    
+    try:
+        # Call helper function to generate subtitles
+        success = generate_subtitles_for_audiobook(
             book_id=book_id,
             language=language,
             audiobook_dict=audiobook_dict
         )
         
         if success:
-            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", "Audio combination completed successfully")
+            log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "SUCCESS", "Subtitle generation completed")
             return True
         else:
-            log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", "Audio combination failed")
+            log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "ERROR", "Subtitle generation failed")
             return False
         
     except Exception as e:
-        log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", f"Exception: {str(e)}")
+        log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "ERROR", f"Exception: {str(e)}")
         return False
+
+
+
+
+def execute_step7_generate_image_prompts(audiobook_dict: dict) -> bool:
+    """
+    ################################################################################
+    # STEP7_generate_image_prompts: Generate image prompts for audiobook thumbnails
+    #
+    # Purpose: Read combination plan and generate image prompts for each part
+    # Input:   combination_plan.json and book metadata
+    # Output:  Image prompt files and updated combination plan with prompt paths
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "PROCESSING", "Image prompt generation started")
+    
+    try:
+        # Call helper function to generate image prompts
+        success = generate_image_prompts_for_audiobook(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "SUCCESS", "Image prompt generation completed")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "ERROR", "Image prompt generation failed")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+def execute_step8_create_image_jobs(audiobook_dict: dict) -> bool:
+    """
+    ################################################################################
+    # STEP8_create_image_jobs: Create ComfyUI image generation jobs
+    #
+    # Purpose: Read combination plan and create ComfyUI job files for image generation
+    # Input:   Image prompts from STEP7 in foundry structure
+    # Output:  ComfyUI job YAML files in comfyui_jobs/processing/
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "PROCESSING", "Image job creation started")
+    
+    try:
+        # Call helper function to create image jobs
+        success = create_image_jobs_for_audiobook(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "SUCCESS", "Image job creation completed")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "ERROR", "Image job creation failed")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+
+def execute_step9_monitor_and_move_images(audiobook_dict: dict, current_step):
+    """
+    ################################################################################
+    # STEP9_monitor_and_move_images: Monitor image job completion and move image files
+    #
+    # Purpose: Monitor ComfyUI image job completion and organize generated image files
+    # Input:   Complete audiobook dict with book details
+    # Output:  Image files organized in foundry/{book_id}/{language}/images/
+    # Returns: "processing" if jobs still running, True if completed, False if failed
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    if current_step == "pending" or current_step == "failed":
+        add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'processing')
+        log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "PROCESSING", "Image monitoring and moving started")
+    
+    try:
+        # Check ComfyUI image job status for this book
+        job_status = get_comfyui_image_job_status(book_id)
+        
+        if not job_status:
+            log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", "No ComfyUI image jobs found for this book")
+            return False
+        
+        # Check if all jobs are done
+        pending_count = job_status.get('pending', 0)
+        processing_count = job_status.get('processing', 0) 
+        done_count = job_status.get('done', 0)
+        failed_count = job_status.get('failed', 0)
+        
+        log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "PROGRESS", 
+                     f"Image job status - Done: {done_count}, Pending: {pending_count}, Processing: {processing_count}, Failed: {failed_count}")
+        
+        # If there are still pending or processing jobs, wait
+        if pending_count > 0 or processing_count > 0:
+            log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "WAITING", "ComfyUI image jobs still in progress - waiting for completion")
+            return "processing"  # Special return value to indicate still processing
+        
+        # If there are failed jobs, report error
+        if failed_count > 0 and done_count == 0:
+            log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", f"{failed_count} image jobs failed with no successful completions")
+            return False
+        
+        # All jobs are done - proceed with moving files
+        log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "PROGRESS", f"All {done_count} ComfyUI image jobs completed - moving image files")
+        
+        # Move image files from ComfyUI output to foundry
+        success = move_comfyui_image_files(book_id, language)
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "SUCCESS", "Image files moved successfully to foundry images directory")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", "Failed to move image files")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+
+def execute_step10_select_images(audiobook_dict: dict) -> bool:
+    """
+    ################################################################################
+    # STEP10_select_images: Select thumbnail images for audiobook parts
+    #
+    # Purpose: Randomly select one image per part from generated images
+    # Input:   Generated images in foundry/{book_id}/{language}/images/
+    # Output:  Updated combination plan with selected image paths
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP10_select_images', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP10_select_images", "PROCESSING", "Image selection started")
+    
+    try:
+        # Call helper function to select images
+        success = select_images_for_audiobook(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP10_select_images", "SUCCESS", "Image selection completed")
+            return True
+        else:
+            log_and_print(audiobook_id, book_id, "STEP10_select_images", "ERROR", "Image selection failed")
+            return False
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP10_select_images", "ERROR", f"Exception: {str(e)}")
+        return False
+
 
 if __name__ == "__main__":
     main()

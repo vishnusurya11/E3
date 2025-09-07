@@ -553,6 +553,7 @@ def combine_audio_from_foundry(
     book_id: str,
     language: str = 'eng',
     audiobook_dict: Dict = None,
+    combination_plan: Dict = None,
     chunk_gap_ms: int = 500,
     chapter_gap_ms: int = 1000,
     ffmpeg_path: str = "ffmpeg",
@@ -595,12 +596,12 @@ def combine_audio_from_foundry(
         print(f"📁 Input: {input_path}")
         print(f"📁 Output: {output_path}")
     
-    # Call the main combine function with foundry-specific parameters
+    # Call the main combine function with foundry-specific parameters and combination plan
     result = combine_audio_for_book(
         book_id=book_id,
         input_path=input_path,
         output_path=output_path,
-        combination_plan=None,  # Single file for now
+        combination_plan=combination_plan,  # Use the provided combination plan
         metadata_sources=metadata_sources,
         chunk_gap_ms=chunk_gap_ms,
         chapter_gap_ms=chapter_gap_ms,

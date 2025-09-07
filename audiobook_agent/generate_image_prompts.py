@@ -1523,6 +1523,139 @@ def generate_image_prompts(
     )
 
 
+def generate_image_prompts_from_foundry(
+    book_id: str,
+    language: str,
+    audiobook_dict: Dict,
+    model_profile: str = 'balanced',
+    verbose: bool = True
+) -> Dict:
+    """
+    Generate image prompts using new foundry architecture with combination_plan.json.
+    
+    Wrapper function that adapts combination_plan.json data format for the existing
+    generate_image_prompts_for_book() function.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        model_profile: Model profile for generation
+        verbose: Whether to print progress messages
+        
+    Returns:
+        Dict with success status and generated prompts data
+    """
+    import json
+    import tempfile
+    import os
+    
+    if verbose:
+        print(f"🎨 Starting image prompt generation for foundry architecture")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        error_msg = f"Combination plan not found: {plan_file}"
+        if verbose:
+            print(f"❌ ERROR: {error_msg}")
+        return {'success': False, 'error': error_msg}
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        # Create temporary metadata file in expected format
+        temp_metadata = {
+            'audio_combination_plan': combination_plan,  # Nest under expected key
+            'book_id': book_id,
+            'book_title': audiobook_dict.get('book_name', book_id),
+            'author': audiobook_dict.get('author', 'Unknown'),
+            'narrator': audiobook_dict.get('narrator_name', 'Unknown')
+        }
+        
+        # Create temporary metadata file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as temp_file:
+            json.dump(temp_metadata, temp_file, indent=2, ensure_ascii=False)
+            temp_metadata_path = temp_file.name
+        
+        if verbose:
+            print(f"📄 Created temporary metadata file: {temp_metadata_path}")
+            print(f"🔗 Adapting combination plan for existing image prompt function")
+        
+        # Call existing function with adapted data
+        result = generate_image_prompts_for_book(
+            book_id=book_id,
+            book_title=audiobook_dict.get('book_name', book_id),
+            author=audiobook_dict.get('author', 'Unknown'),
+            narrated_by=audiobook_dict.get('narrator_name', 'Unknown'),
+            metadata_file_path=temp_metadata_path,
+            model_profile=model_profile,
+            verbose=verbose
+        )
+        
+        # If successful, extract prompts and save to foundry structure
+        if result.get('success', False):
+            try:
+                # Read the updated temporary metadata file to get generated prompts
+                with open(temp_metadata_path, 'r', encoding='utf-8') as f:
+                    updated_metadata = json.load(f)
+                
+                image_prompts_data = updated_metadata.get('image_prompts', {})
+                parts_data = image_prompts_data.get('parts', [])
+                
+                if parts_data:
+                    # Save prompts to foundry structure for each part
+                    combinations = combination_plan.get('combinations', [])
+                    for i, part_data in enumerate(parts_data):
+                        part_num = part_data['part']
+                        
+                        # Determine output filename based on number of parts
+                        if len(combinations) > 1:
+                            prompts_filename = f"{book_id}_part{part_num}_prompts.json"
+                        else:
+                            prompts_filename = f"{book_id}_prompts.json"
+                        
+                        prompts_output_path = f"foundry/{book_id}/{language}/image_prompts/{prompts_filename}"
+                        
+                        # Create directory
+                        os.makedirs(os.path.dirname(prompts_output_path), exist_ok=True)
+                        
+                        # Save prompts to foundry location
+                        with open(prompts_output_path, 'w', encoding='utf-8') as f:
+                            json.dump(part_data, f, indent=2, ensure_ascii=False)
+                        
+                        if verbose:
+                            print(f"💾 Saved image prompts for Part {part_num}: {prompts_output_path}")
+                
+            except Exception as e:
+                if verbose:
+                    print(f"⚠️ Warning: Could not extract prompts to foundry structure: {e}")
+        
+        # Clean up temporary file
+        try:
+            os.unlink(temp_metadata_path)
+            if verbose:
+                print(f"🗑️ Cleaned up temporary metadata file")
+        except:
+            pass  # Don't fail if cleanup fails
+        
+        if verbose:
+            if result.get('success', False):
+                print(f"✅ Image prompt generation completed successfully")
+            else:
+                print(f"❌ Image prompt generation failed: {result.get('error', 'Unknown error')}")
+        
+        return result
+        
+    except Exception as e:
+        error_msg = f"Error adapting data for image prompt generation: {e}"
+        if verbose:
+            print(f"❌ ERROR: {error_msg}")
+        return {'success': False, 'error': error_msg}
+
+
 def main():
     """Test the enhanced system"""
     print("🎬 ENHANCED AUDIOBOOK THUMBNAIL GENERATOR - MULTI-MODEL AGENT COUNCIL")

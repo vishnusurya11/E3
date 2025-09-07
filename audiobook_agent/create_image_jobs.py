@@ -65,7 +65,7 @@ def create_image_job(
             # Keep negative prompt empty (node 7)
             "7_text": "",
             # Set output filename prefix
-            "60_filename_prefix": f"images/{clean_book_id}/part{part_number}/prompt{prompt_data['rank']}"
+            "60_filename_prefix": f"images/alpha/{clean_book_id}/part{part_number}/prompt{prompt_data['rank']}"
         },
         "outputs": {
             "file_path": f"{finished_images_dir}/{clean_book_id}_part{part_number}_prompt{prompt_data['rank']}.png"
@@ -256,6 +256,126 @@ def create_image_jobs_for_book(
         print(f"\n❌ Failed to create image jobs for {book_id}: {result['error']}")
     
     return result
+
+
+def create_image_jobs_from_foundry(
+    book_id: str,
+    language: str,
+    audiobook_dict: Dict,
+    jobs_output_dir: str = "comfyui_jobs/processing/image",
+    finished_images_dir: str = "comfyui_jobs/finished/image",
+    workflow_template: str = DEFAULT_WORKFLOW_FILE,
+    verbose: bool = True
+) -> Dict:
+    """
+    Create ComfyUI image jobs from foundry structure using combination_plan.json.
+    
+    Reads combination plan and image prompts to create ComfyUI job files.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg23731')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        jobs_output_dir: Directory for ComfyUI job YAML files
+        finished_images_dir: Directory where finished images will be stored
+        workflow_template: Path to ComfyUI workflow JSON template
+        verbose: Whether to print progress messages
+        
+    Returns:
+        Dict with success status and job creation results
+    """
+    import json
+    import os
+    
+    if verbose:
+        print(f"🖼️ Creating image jobs for {book_id} ({language}) using foundry structure")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        error_msg = f"Combination plan not found: {plan_file}"
+        if verbose:
+            print(f"❌ ERROR: {error_msg}")
+        return {'success': False, 'error': error_msg}
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        combinations = combination_plan.get('combinations', [])
+        if not combinations:
+            error_msg = "No combinations found in plan file"
+            if verbose:
+                print(f"❌ ERROR: {error_msg}")
+            return {'success': False, 'error': error_msg}
+        
+        total_jobs_created = 0
+        jobs_created_per_part = {}
+        
+        # Create jobs for each part
+        for combo in combinations:
+            part_num = combo['part']
+            prompts_path = combo.get('image_prompts_path')
+            
+            if not prompts_path or not os.path.exists(prompts_path):
+                if verbose:
+                    print(f"⚠️ Warning: Image prompts not found for Part {part_num}: {prompts_path}")
+                continue
+            
+            if verbose:
+                print(f"🎨 Creating image jobs for Part {part_num}")
+                print(f"   Prompts: {prompts_path}")
+            
+            # Read image prompts for this part
+            with open(prompts_path, 'r', encoding='utf-8') as f:
+                part_prompts_data = json.load(f)
+            
+            prompts = part_prompts_data.get('prompts', [])
+            if not prompts:
+                if verbose:
+                    print(f"⚠️ Warning: No prompts found in {prompts_path}")
+                continue
+            
+            # Create jobs for each prompt in this part
+            part_jobs_created = 0
+            for prompt_data in prompts:
+                job_path = create_image_job(
+                    book_id=book_id,
+                    part_number=part_num,
+                    prompt_data=prompt_data,
+                    book_metadata=audiobook_dict,
+                    jobs_output_dir=jobs_output_dir,
+                    finished_images_dir=finished_images_dir,
+                    workflow_template=workflow_template
+                )
+                
+                if job_path:
+                    part_jobs_created += 1
+                    total_jobs_created += 1
+            
+            jobs_created_per_part[part_num] = part_jobs_created
+            
+            if verbose:
+                print(f"✅ Created {part_jobs_created} image jobs for Part {part_num}")
+        
+        if verbose:
+            print(f"✅ Total image jobs created: {total_jobs_created}")
+            for part, count in jobs_created_per_part.items():
+                print(f"   Part {part}: {count} jobs")
+        
+        return {
+            'success': True,
+            'total_jobs_created': total_jobs_created,
+            'jobs_per_part': jobs_created_per_part,
+            'parts_processed': len(jobs_created_per_part)
+        }
+        
+    except Exception as e:
+        error_msg = f"Error creating image jobs from foundry: {e}"
+        if verbose:
+            print(f"❌ ERROR: {error_msg}")
+        return {'success': False, 'error': error_msg}
 
 
 if __name__ == "__main__":

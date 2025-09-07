@@ -519,12 +519,11 @@ def add_audiobook_event(audiobook_id: str, step_number: str, status: str) -> boo
         return False
 
 
-def get_comfyui_job_status_by_book_id(book_id: str) -> Dict:
+def get_comfyui_audio_job_status(book_id: str) -> Dict:
     """
-    Get ComfyUI job status counts for a specific book_id.
+    Get ComfyUI audio job status counts for a specific book_id.
     
-    Queries comfyui_jobs table for jobs where config_name contains the book_id
-    and returns status counts as a dictionary.
+    Queries comfyui_jobs table for SPEECH jobs only.
     
     Args:
         book_id: Book identifier (e.g., 'pg74')
@@ -539,13 +538,13 @@ def get_comfyui_job_status_by_book_id(book_id: str) -> Dict:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            # Query job status counts for this book_id
+            # Query audio job status counts for this book_id (SPEECH pattern)
             cursor.execute("""
                 SELECT status, COUNT(*) as count
                 FROM comfyui_jobs 
                 WHERE config_name LIKE ?
                 GROUP BY status
-            """, (f'%{book_id}%',))
+            """, (f'SPEECH_{book_id}%',))
             
             results = cursor.fetchall()
             
@@ -554,69 +553,766 @@ def get_comfyui_job_status_by_book_id(book_id: str) -> Dict:
             for row in results:
                 status_counts[row['status']] = row['count']
             
-            print(f"📊 ComfyUI job status for {book_id}: {status_counts}")
+            print(f"📊 ComfyUI audio job status for {book_id}: {status_counts}")
             return status_counts
             
     except Exception as e:
-        print(f"❌ Error getting ComfyUI job status for {book_id}: {e}")
+        print(f"❌ Error getting ComfyUI audio job status for {book_id}: {e}")
         return {}
+
+
+def get_comfyui_image_job_status(book_id: str) -> Dict:
+    """
+    Get ComfyUI image job status counts for a specific book_id.
+    
+    Queries comfyui_jobs table for T2I (text-to-image) jobs only.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        
+    Returns:
+        Dict: Status counts like {'done': 3, 'pending': 152, 'processing': 1}
+    """
+    try:
+        db_path = get_normalized_db_path()
+        
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Query image job status counts for this book_id (T2I pattern)
+            cursor.execute("""
+                SELECT status, COUNT(*) as count
+                FROM comfyui_jobs 
+                WHERE config_name LIKE ?
+                GROUP BY status
+            """, (f'T2I_{book_id}%',))
+            
+            results = cursor.fetchall()
+            
+            # Convert to dict
+            status_counts = {}
+            for row in results:
+                status_counts[row['status']] = row['count']
+            
+            print(f"📊 ComfyUI image job status for {book_id}: {status_counts}")
+            return status_counts
+            
+    except Exception as e:
+        print(f"❌ Error getting ComfyUI image job status for {book_id}: {e}")
+        return {}
+
+
+# Keep original function for backward compatibility
+def get_comfyui_job_status_by_book_id(book_id: str) -> Dict:
+    """
+    Get ComfyUI job status counts for a specific book_id (all job types).
+    
+    Legacy function - prefer using specific audio/image functions.
+    """
+    return get_comfyui_audio_job_status(book_id)
 
 
 def move_comfyui_audio_files(book_id: str, language: str = 'eng') -> bool:
     """
-    Move completed ComfyUI audio files from dev output to foundry speech directory.
+    Move completed ComfyUI audio folder structure from dev output to foundry speech directory.
     
-    Moves files from D:/Projects/pheonix/dev/output/speech/alpha/{book_id}* 
-    to foundry/{book_id}/speech/
+    Copies entire folder structure from D:/Projects/pheonix/dev/output/speech/alpha/{book_id}/
+    to foundry/{book_id}/{language}/speech/ preserving ch001/chunk001/audio_*.flac structure
     
     Args:
         book_id: Book identifier (e.g., 'pg74')
         language: Language code (default: 'eng')
         
     Returns:
-        bool: True if files moved successfully
+        bool: True if folder structure moved successfully
     """
-    import glob
     import shutil
     import os
+    from pathlib import Path
     
-    # Source pattern - ComfyUI output directory
-    source_pattern = f"D:/Projects/pheonix/dev/output/speech/alpha/{book_id}*"
+    # Source directory - ComfyUI output with chapter/chunk structure
+    source_dir = f"D:/Projects/pheonix/dev/output/speech/alpha/{book_id}"
     
     # Destination directory 
     dest_dir = f"foundry/{book_id}/{language}/speech"
     
-    print(f"🔍 Looking for audio files: {source_pattern}")
+    print(f"🔍 Looking for audio folder: {source_dir}")
     
     try:
-        # Find source files
-        source_files = glob.glob(source_pattern)
+        source_path = Path(source_dir)
+        dest_path = Path(dest_dir)
         
-        if not source_files:
-            print(f"❌ No audio files found matching: {source_pattern}")
+        if not source_path.exists():
+            print(f"❌ Source folder not found: {source_dir}")
             return False
         
-        # Create destination directory
-        os.makedirs(dest_dir, exist_ok=True)
+        if not source_path.is_dir():
+            print(f"❌ Source path is not a directory: {source_dir}")
+            return False
         
-        # Move each file
-        moved_count = 0
-        for source_file in source_files:
-            filename = os.path.basename(source_file)
-            dest_path = os.path.join(dest_dir, filename)
-            
-            print(f"📁 Moving: {source_file} -> {dest_path}")
-            
-            # Use copy2 to preserve metadata, then remove source
-            shutil.copy2(source_file, dest_path)
-            os.remove(source_file)
-            moved_count += 1
+        # Create parent destination directory
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
         
-        print(f"✅ Successfully moved {moved_count} audio files to {dest_dir}")
+        # If destination already exists, remove it first
+        if dest_path.exists():
+            print(f"🗑️ Removing existing destination: {dest_path}")
+            shutil.rmtree(dest_path)
+        
+        print(f"📁 Copying folder structure: {source_dir} -> {dest_dir}")
+        
+        # Copy entire directory tree
+        shutil.copytree(source_path, dest_path)
+        
+        # Count copied files for verification
+        audio_files = list(dest_path.rglob("*.flac")) + list(dest_path.rglob("*.wav")) + list(dest_path.rglob("*.mp3"))
+        chapter_dirs = [d for d in dest_path.iterdir() if d.is_dir() and d.name.startswith('ch')]
+        
+        print(f"✅ Successfully copied folder structure to {dest_dir}")
+        print(f"📊 Found {len(chapter_dirs)} chapters with {len(audio_files)} audio files")
+        
+        # Now remove the source directory since we've successfully copied it
+        print(f"🗑️ Removing source directory: {source_dir}")
+        shutil.rmtree(source_path)
+        
         return True
         
     except Exception as e:
-        print(f"❌ Error moving audio files: {e}")
+        print(f"❌ Error moving audio folder structure: {e}")
+        return False
+
+
+def move_comfyui_image_files(book_id: str, language: str = 'eng') -> bool:
+    """
+    Move completed ComfyUI image files from dev output to foundry images directory.
+    
+    Copies entire folder structure from D:/Projects/pheonix/dev/output/image/alpha/{book_id}/
+    to foundry/{book_id}/{language}/images/ preserving folder structure
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (default: 'eng')
+        
+    Returns:
+        bool: True if folder structure moved successfully
+    """
+    import shutil
+    import os
+    from pathlib import Path
+    
+    # Source directory - ComfyUI image output
+    source_dir = f"D:/Projects/pheonix/dev/output/images/alpha/{book_id}"
+    
+    # Destination directory 
+    dest_dir = f"foundry/{book_id}/{language}/images"
+    
+    print(f"🔍 Looking for image folder: {source_dir}")
+    
+    try:
+        source_path = Path(source_dir)
+        dest_path = Path(dest_dir)
+        
+        if not source_path.exists():
+            print(f"❌ Source image folder not found: {source_dir}")
+            return False
+        
+        if not source_path.is_dir():
+            print(f"❌ Source path is not a directory: {source_dir}")
+            return False
+        
+        # Create parent destination directory
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # If destination already exists, remove it first
+        if dest_path.exists():
+            print(f"🗑️ Removing existing destination: {dest_path}")
+            shutil.rmtree(dest_path)
+        
+        print(f"📁 Copying image folder structure: {source_dir} -> {dest_dir}")
+        
+        # Copy entire directory tree
+        shutil.copytree(source_path, dest_path)
+        
+        # Count copied files for verification
+        image_files = list(dest_path.rglob("*.png")) + list(dest_path.rglob("*.jpg")) + list(dest_path.rglob("*.jpeg"))
+        
+        print(f"✅ Successfully copied image folder structure to {dest_dir}")
+        print(f"📊 Found {len(image_files)} image files")
+        
+        # Now remove the source directory since we've successfully copied it
+        print(f"🗑️ Removing source directory: {source_dir}")
+        shutil.rmtree(source_path)
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error moving image folder structure: {e}")
+        return False
+
+
+def combine_audiobook_files(book_id: str, language: str, audiobook_dict: Dict, combination_plan: Dict = None) -> bool:
+    """
+    Combine individual audio files into complete audiobook using foundry structure.
+    
+    Calls the modified simple_ffmpeg_combine.py functions to create chapter-wise
+    and final combined audio files.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if audio combination completed successfully
+    """
+    try:
+        # Import the foundry-specific combine function
+        from simple_ffmpeg_combine import combine_audio_from_foundry
+        
+        print(f"🎵 Starting audio combination for {book_id} ({language})")
+        
+        # Call the combination function with foundry structure and plan
+        result = combine_audio_from_foundry(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict,
+            combination_plan=combination_plan,  # Pass the combination plan
+            chunk_gap_ms=500,      # Gap between chunks
+            chapter_gap_ms=1000,   # Gap between chapters
+            ffmpeg_path="ffmpeg",  # Assume ffmpeg is in PATH
+            audio_format="mp3",    # Standard format
+            audio_bitrate="192k",  # Good quality
+            verbose=True
+        )
+        
+        if result['success']:
+            parts_created = result.get('parts_created', 0)
+            chapters_processed = result.get('total_chapters_processed', 0)
+            
+            print(f"✅ Audio combination successful:")
+            print(f"   📚 Chapters processed: {chapters_processed}")
+            print(f"   🎧 Audio parts created: {parts_created}")
+            
+            # Log final files created
+            if 'final_files' in result:
+                for file_info in result['final_files']:
+                    print(f"   📄 Created: {file_info['file']}")
+            
+            return True
+        else:
+            error_msg = result.get('error', 'Unknown error')
+            print(f"❌ Audio combination failed: {error_msg}")
+            return False
+        
+    except ImportError as e:
+        print(f"❌ Failed to import audio combination module: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Error during audio combination: {e}")
+        return False
+
+
+def plan_audio_combinations(book_id: str, language: str, audiobook_dict: Dict) -> Dict:
+    """
+    Analyze audio duration and create optimal combination plan for final audiobook.
+    
+    Checks total duration and creates plan to split into parts if over 10-hour limit.
+    Based on the logic from cli_backup.py STEP 7.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        Dict: Combination plan with parts/chapters distribution and duration info
+    """
+    import subprocess
+    import json
+    from pathlib import Path
+    from math import ceil
+    
+    MAX_HOURS_PER_PART = 10  # Maximum hours per audiobook part (YouTube limits)
+    
+    print(f"📊 Planning audio combinations for {book_id} ({language})")
+    
+    # Chapter audio files directory (output from STEP5)
+    chapters_dir = Path(f"foundry/{book_id}/{language}/combined_audio/chapters")
+    
+    if not chapters_dir.exists():
+        print(f"❌ Chapters directory not found: {chapters_dir}")
+        return {'success': False, 'error': f'Chapters directory not found: {chapters_dir}'}
+    
+    try:
+        # Get all chapter audio files
+        chapter_files = sorted(chapters_dir.glob("chapter_*.mp3"))
+        if not chapter_files:
+            chapter_files = sorted(chapters_dir.glob("chapter_*.flac"))
+        if not chapter_files:
+            chapter_files = sorted(chapters_dir.glob("chapter_*.wav"))
+        
+        if not chapter_files:
+            print(f"❌ No chapter audio files found in {chapters_dir}")
+            return {'success': False, 'error': 'No chapter audio files found'}
+        
+        print(f"🔍 Found {len(chapter_files)} chapter files")
+        
+        # Calculate duration for each chapter using ffprobe
+        chapter_durations = []
+        total_duration_seconds = 0
+        
+        for chapter_file in chapter_files:
+            try:
+                cmd = [
+                    "ffprobe", "-v", "error", "-show_entries",
+                    "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
+                    str(chapter_file)
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                duration = float(result.stdout.strip())
+                chapter_durations.append(duration)
+                total_duration_seconds += duration
+                
+                print(f"  📄 {chapter_file.name}: {duration/3600:.2f}h ({duration/60:.1f}min)")
+                
+            except Exception as e:
+                print(f"❌ Error getting duration for {chapter_file}: {e}")
+                return {'success': False, 'error': f'Error analyzing chapter duration: {e}'}
+        
+        # Convert to hours and minutes
+        total_hours = total_duration_seconds / 3600
+        total_minutes = total_duration_seconds / 60
+        
+        print(f"📊 Total audiobook duration: {total_hours:.2f} hours ({total_minutes:.1f} minutes)")
+        print(f"🎯 Max hours per part: {MAX_HOURS_PER_PART}")
+        
+        # Plan combinations based on total duration
+        if total_hours <= MAX_HOURS_PER_PART:
+            # Single part - fits within limit
+            print(f"✅ Audiobook fits within {MAX_HOURS_PER_PART}-hour limit - single part")
+            combinations = [{
+                'part': 1,
+                'chapters': list(range(1, len(chapter_durations) + 1)),
+                'chapter_range': f"1-{len(chapter_durations)}",
+                'duration_seconds': total_duration_seconds,
+                'duration_hours': total_hours,
+                'output_filename': f"{book_id}_full_book.mp3",
+                'audio_path': f"foundry/{book_id}/{language}/combined_audio/{book_id}_full_book.mp3"
+            }]
+        else:
+            # Multiple parts - need to split
+            parts_needed = ceil(total_hours / MAX_HOURS_PER_PART)
+            target_duration_per_part = total_duration_seconds / parts_needed
+            
+            print(f"⚠️ Audiobook exceeds {MAX_HOURS_PER_PART}-hour limit - splitting into {parts_needed} parts")
+            print(f"🎯 Target duration per part: {target_duration_per_part/3600:.2f} hours")
+            
+            # Smart chapter distribution
+            combinations = []
+            current_part = 1
+            current_chapters = []
+            current_duration = 0
+            
+            for i, duration in enumerate(chapter_durations, 1):
+                current_chapters.append(i)
+                current_duration += duration
+                
+                # Check if we should start a new part
+                remaining_chapters = len(chapter_durations) - len(current_chapters)
+                remaining_parts = parts_needed - current_part
+                
+                # Start new part if we've reached optimal distribution point
+                if (remaining_parts > 0 and remaining_chapters > 0 and
+                    current_duration >= target_duration_per_part):
+                    
+                    # Create combination for current part
+                    combinations.append({
+                        'part': current_part,
+                        'chapters': current_chapters.copy(),
+                        'chapter_range': f"{current_chapters[0]}-{current_chapters[-1]}",
+                        'duration_seconds': current_duration,
+                        'duration_hours': current_duration / 3600,
+                        'output_filename': f"{book_id}_part{current_part}.mp3",
+                        'audio_path': f"foundry/{book_id}/{language}/combined_audio/{book_id}_part{current_part}.mp3"
+                    })
+                    
+                    print(f"  📦 Part {current_part}: Chapters {current_chapters[0]}-{current_chapters[-1]} ({current_duration/3600:.2f}h)")
+                    
+                    # Start new part
+                    current_part += 1
+                    current_chapters = []
+                    current_duration = 0
+            
+            # Add remaining chapters to final part
+            if current_chapters:
+                combinations.append({
+                    'part': current_part,
+                    'chapters': current_chapters.copy(),
+                    'chapter_range': f"{current_chapters[0]}-{current_chapters[-1]}",
+                    'duration_seconds': current_duration,
+                    'duration_hours': current_duration / 3600,
+                    'output_filename': f"{book_id}_part{current_part}.mp3",
+                    'audio_path': f"foundry/{book_id}/{language}/combined_audio/{book_id}_part{current_part}.mp3"
+                })
+                
+                print(f"  📦 Part {current_part}: Chapters {current_chapters[0]}-{current_chapters[-1]} ({current_duration/3600:.2f}h)")
+        
+        # Create final combination plan
+        combination_plan = {
+            'success': True,
+            'book_id': book_id,
+            'language': language,
+            'total_duration_seconds': total_duration_seconds,
+            'total_duration_minutes': total_minutes,
+            'total_duration_hours': total_hours,
+            'max_hours_per_part': MAX_HOURS_PER_PART,
+            'exceeds_limit': total_hours > MAX_HOURS_PER_PART,
+            'parts_needed': len(combinations),
+            'chapter_durations': chapter_durations,
+            'combinations': combinations
+        }
+        
+        print(f"✅ Combination plan created: {len(combinations)} parts")
+        for combo in combinations:
+            print(f"  📄 {combo['output_filename']}: {combo['duration_hours']:.2f}h")
+        
+        return combination_plan
+        
+    except Exception as e:
+        print(f"❌ Error creating combination plan: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+def generate_subtitles_for_audiobook(book_id: str, language: str, audiobook_dict: Dict) -> bool:
+    """
+    Generate subtitle files for audiobook based on combination plan.
+    
+    Reads combination_plan.json and generates subtitles for each part,
+    then updates the plan file with subtitle paths.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if subtitles generated successfully
+    """
+    import json
+    import os
+    from pathlib import Path
+    
+    print(f"📝 Generating subtitles for {book_id} ({language})")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        print(f"❌ Combination plan not found: {plan_file}")
+        return False
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        combinations = combination_plan.get('combinations', [])
+        if not combinations:
+            print(f"❌ No combinations found in plan file")
+            return False
+        
+        print(f"🔍 Found {len(combinations)} parts to generate subtitles for")
+        
+        # Import subtitle generation function
+        from generate_subtitles import generate_subtitles_for_book
+        
+        # Create subtitles directory
+        subtitles_dir = f"foundry/{book_id}/{language}/subtitles"
+        os.makedirs(subtitles_dir, exist_ok=True)
+        
+        # Generate subtitles for each part
+        for combo in combinations:
+            part_num = combo['part']
+            chapters = combo['chapters']
+            audio_filename = combo['output_filename']
+            
+            # Subtitle file path
+            subtitle_filename = audio_filename.replace('.mp3', '.srt').replace('.flac', '.srt').replace('.wav', '.srt')
+            subtitle_path = f"foundry/{book_id}/{language}/subtitles/{subtitle_filename}"
+            
+            print(f"📝 Generating subtitles for Part {part_num} (Chapters: {combo['chapter_range']})")
+            print(f"   Audio: {combo['audio_path']}")
+            print(f"   Subtitle: {subtitle_path}")
+            
+            # Generate subtitles using existing function
+            result = generate_subtitles_for_book(
+                book_id=book_id,
+                audio_path=f"foundry/{book_id}/{language}/speech",  # Source audio with chapters/chunks
+                text_path=f"foundry/{book_id}/{language}/chapters",  # Chapter metadata  
+                output_path=subtitles_dir,
+                chapters_to_include=chapters,  # Only chapters for this part
+                copy_to_combined_audio=False,  # We'll handle file placement
+                verbose=True
+            )
+            
+            if not result.get('success', False):
+                print(f"❌ Failed to generate subtitles for Part {part_num}")
+                return False
+            
+            # Add subtitle path to combination plan
+            combo['subtitle_path'] = subtitle_path
+            
+            print(f"✅ Subtitles generated for Part {part_num}")
+        
+        # Save updated combination plan with subtitle paths
+        with open(plan_file, 'w', encoding='utf-8') as f:
+            json.dump(combination_plan, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Subtitle generation completed - updated combination plan saved")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error generating subtitles: {e}")
+        return False
+
+
+def generate_image_prompts_for_audiobook(book_id: str, language: str, audiobook_dict: Dict, verbose: bool = True) -> bool:
+    """
+    Generate image prompts for audiobook based on combination plan.
+    
+    Reads combination_plan.json and generates image prompts for each part,
+    then updates the plan file with image prompt paths.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg74')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if image prompts generated successfully
+    """
+    import json
+    import os
+    from pathlib import Path
+    
+    print(f"🎨 Generating image prompts for {book_id} ({language})")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        print(f"❌ Combination plan not found: {plan_file}")
+        return False
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        combinations = combination_plan.get('combinations', [])
+        if not combinations:
+            print(f"❌ No combinations found in plan file")
+            return False
+        
+        print(f"🔍 Found {len(combinations)} parts to generate image prompts for")
+        
+        # Import image prompt generation function (new foundry wrapper)
+        from generate_image_prompts import generate_image_prompts_from_foundry
+        
+        # Create image prompts directory
+        prompts_dir = f"foundry/{book_id}/{language}/image_prompts"
+        os.makedirs(prompts_dir, exist_ok=True)
+        
+        # Generate image prompts using new foundry wrapper
+        print(f"🎨 Calling foundry-compatible image prompt generation")
+        
+        result = generate_image_prompts_from_foundry(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict,
+            model_profile='balanced',
+            verbose=verbose
+        )
+        
+        if result.get('success', False):
+            # Update combination plan with image prompt paths
+            for combo in combinations:
+                part_num = combo['part']
+                
+                # Image prompts file path
+                if len(combinations) > 1:
+                    # Multi-part: include part number
+                    prompts_filename = f"{book_id}_part{part_num}_prompts.json"
+                else:
+                    # Single part: no part number needed
+                    prompts_filename = f"{book_id}_prompts.json"
+                
+                prompts_path = f"foundry/{book_id}/{language}/image_prompts/{prompts_filename}"
+                combo['image_prompts_path'] = prompts_path
+                
+                print(f"✅ Updated combination plan with prompts path for Part {part_num}")
+            
+            # Save updated combination plan with image prompt paths
+            with open(plan_file, 'w', encoding='utf-8') as f:
+                json.dump(combination_plan, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ Image prompt generation completed - updated combination plan saved")
+            return True
+        else:
+            error_msg = result.get('error', 'Image prompt generation failed')
+            print(f"❌ {error_msg}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error generating image prompts: {e}")
+        return False
+
+
+def create_image_jobs_for_audiobook(book_id: str, language: str, audiobook_dict: Dict) -> bool:
+    """
+    Create ComfyUI image generation jobs for audiobook based on combination plan.
+    
+    Reads combination_plan.json and image prompts to create ComfyUI job files,
+    similar to how create_tts_audio_jobs works.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg23731')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if image jobs created successfully
+    """
+    try:
+        # Import the foundry-specific image job creation function
+        from create_image_jobs import create_image_jobs_from_foundry
+        
+        print(f"🖼️ Starting image job creation for {book_id} ({language})")
+        
+        # Call the image job creation function with foundry structure
+        result = create_image_jobs_from_foundry(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict,
+            jobs_output_dir="comfyui_jobs/processing/image",  # Organized in image subfolder
+            finished_images_dir="comfyui_jobs/finished/image",   # Organized in image subfolder
+            workflow_template="workflows/image_qwen_image.json",  # Default workflow
+            verbose=True
+        )
+        
+        if result['success']:
+            jobs_created = result.get('total_jobs_created', 0)
+            parts_processed = result.get('parts_processed', 0)
+            
+            print(f"✅ Image job creation successful:")
+            print(f"   🎨 Parts processed: {parts_processed}")
+            print(f"   📄 Total jobs created: {jobs_created}")
+            
+            return True
+        else:
+            error_msg = result.get('error', 'Unknown error')
+            print(f"❌ Image job creation failed: {error_msg}")
+            return False
+        
+    except ImportError as e:
+        print(f"❌ Failed to import image job creation module: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Error during image job creation: {e}")
+        return False
+
+
+def select_images_for_audiobook(book_id: str, language: str, audiobook_dict: Dict) -> bool:
+    """
+    Select one image per part for audiobook thumbnails and update combination plan.
+    
+    Randomly picks one image per part from generated images and adds selected
+    image paths to combination_plan.json.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg23731')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if images selected successfully
+    """
+    import json
+    import os
+    import random
+    from pathlib import Path
+    
+    print(f"🎯 Selecting images for {book_id} ({language})")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        print(f"❌ Combination plan not found: {plan_file}")
+        return False
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        combinations = combination_plan.get('combinations', [])
+        if not combinations:
+            print(f"❌ No combinations found in plan file")
+            return False
+        
+        print(f"🔍 Found {len(combinations)} parts to select images for")
+        
+        # Images base directory
+        images_base_dir = Path(f"foundry/{book_id}/{language}/images")
+        
+        if not images_base_dir.exists():
+            print(f"❌ Images directory not found: {images_base_dir}")
+            return False
+        
+        # Select one image per part
+        selections_made = 0
+        for combo in combinations:
+            part_num = combo['part']
+            
+            # Look for images in this part's directory
+            part_dir = images_base_dir / f"part{part_num}"
+            
+            if not part_dir.exists():
+                print(f"⚠️ Warning: Part {part_num} images directory not found: {part_dir}")
+                continue
+            
+            # Find all image files in this part
+            image_files = []
+            for pattern in ["*.png", "*.jpg", "*.jpeg"]:
+                image_files.extend(list(part_dir.rglob(pattern)))
+            
+            if not image_files:
+                print(f"⚠️ Warning: No image files found for Part {part_num} in {part_dir}")
+                continue
+            
+            # Randomly select one image
+            selected_image = random.choice(image_files)
+            selected_image_path = str(selected_image).replace('\\', '/')  # Normalize path separators
+            
+            # Add selected image path to combination plan
+            combo['selected_image_path'] = selected_image_path
+            selections_made += 1
+            
+            print(f"✅ Part {part_num}: Selected {selected_image.name} from {len(image_files)} images")
+            print(f"   Path: {selected_image_path}")
+        
+        if selections_made == 0:
+            print(f"❌ No images could be selected for any part")
+            return False
+        
+        # Save updated combination plan with selected image paths
+        with open(plan_file, 'w', encoding='utf-8') as f:
+            json.dump(combination_plan, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Image selection completed - {selections_made} images selected")
+        print(f"💾 Updated combination plan saved")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error selecting images: {e}")
         return False
 
 
