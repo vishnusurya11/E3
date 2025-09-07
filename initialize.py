@@ -27,6 +27,121 @@ from typing import Optional
 from comfyui_agent.utils.config_loader import load_env_file
 
 
+def create_database_schema(db_path: str) -> None:
+    """Create complete database schema for E3 system."""
+    
+    # Configure WAL mode for optimal performance
+    with sqlite3.connect(db_path) as conn:
+        # Enable WAL mode for concurrent readers + single writer
+        conn.execute("PRAGMA journal_mode=WAL")
+        # Increase cache size for better performance (10MB)
+        conn.execute("PRAGMA cache_size=10000")
+        # Enable foreign keys
+        conn.execute("PRAGMA foreign_keys=ON")
+        # Set synchronous to NORMAL for better performance
+        conn.execute("PRAGMA synchronous=NORMAL")
+        # Set WAL checkpoint size
+        conn.execute("PRAGMA wal_autocheckpoint=1000")
+        # Additional read/write optimization
+        conn.execute("PRAGMA read_uncommitted=TRUE")   # Allow dirty reads (faster)
+        conn.execute("PRAGMA temp_store=MEMORY")       # Store temp tables in memory  
+        conn.execute("PRAGMA mmap_size=268435456")     # 256MB memory mapping
+        conn.commit()
+    
+    # Create all tables
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        
+        # Create ComfyUI jobs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS comfyui_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_name TEXT NOT NULL UNIQUE,
+                job_type TEXT NOT NULL,
+                workflow_id TEXT NOT NULL,
+                priority INTEGER DEFAULT 50,
+                status TEXT CHECK(status IN ('pending','processing','done','failed')) NOT NULL,
+                run_count INTEGER DEFAULT 0,
+                retries_attempted INTEGER DEFAULT 0,
+                retry_limit INTEGER DEFAULT 2,
+                start_time TEXT,
+                end_time TEXT,
+                duration REAL,
+                error_trace TEXT,
+                metadata TEXT,
+                worker_id TEXT,
+                lease_expires_at TEXT
+            )
+        """)
+        
+        # Create books table (Book Catalog from AUDIOBOOK_CLI_PLAN.md)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS books (
+                id VARCHAR(14) PRIMARY KEY,
+                book_id VARCHAR(20) UNIQUE NOT NULL,
+                book_name VARCHAR(255) NOT NULL,
+                author VARCHAR(255),
+                language CHAR(3) NOT NULL,
+                year_published INTEGER,
+                genre VARCHAR(100),
+                summary TEXT
+            )
+        """)
+        
+        # Create narrators table (Voice Talent Registry from AUDIOBOOK_CLI_PLAN.md)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS narrators (
+                narrator_id VARCHAR(100) PRIMARY KEY,
+                narrator_name VARCHAR(255) NOT NULL,
+                gender VARCHAR(20),
+                sample_filepath VARCHAR(500),
+                language CHAR(3) NOT NULL,
+                accent VARCHAR(50)
+            )
+        """)
+        
+        # Create audiobook_productions table (Generation Master from AUDIOBOOK_CLI_PLAN.md)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audiobook_productions (
+                audiobook_id VARCHAR(14) PRIMARY KEY,
+                book_id VARCHAR(20) NOT NULL,
+                narrator_id VARCHAR(100) NOT NULL,
+                language CHAR(3) NOT NULL,
+                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
+                publish_date TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (book_id) REFERENCES books(book_id),
+                FOREIGN KEY (narrator_id) REFERENCES narrators(narrator_id)
+            )
+        """)
+        
+        # Create audiobook_process_events table (Pipeline Tracker from AUDIOBOOK_CLI_PLAN.md)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audiobook_process_events (
+                audiobook_id VARCHAR(14) NOT NULL,
+                timestamp TIMESTAMP NOT NULL,
+                step_number VARCHAR(100) NOT NULL,
+                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
+                PRIMARY KEY (audiobook_id, timestamp),
+                FOREIGN KEY (audiobook_id) REFERENCES audiobook_productions(audiobook_id)
+            )
+        """)
+        
+        # Create performance indices
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_books_book_id ON books(book_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_books_language ON books(language)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_books_genre ON books(genre)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_narrators_language ON narrators(language)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_productions_book_id ON audiobook_productions(book_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_productions_status ON audiobook_productions(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_audiobook_id ON audiobook_process_events(audiobook_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_status_priority ON comfyui_jobs(status, priority)")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comfyui_jobs_config_name ON comfyui_jobs(config_name)")
+        
+        conn.commit()
+
+
 def validate_database_schema(db_path: str) -> bool:
     """Validate that the database has the expected schema structure for both tables.
     
@@ -43,33 +158,22 @@ def validate_database_schema(db_path: str) -> bool:
     }
     
     # Expected normalized table schemas
-    expected_titles_columns = {
-        'book_id', 'title', 'author', 'genre', 'language', 'publication_year',
-        'source_url', 'input_file_path', 'audiobook_complete', 'audiobook_narrator_id',
-        'created_at', 'updated_at'
+    expected_books_columns = {
+        'id', 'book_id', 'book_name', 'author', 'language', 'year_published',
+        'genre', 'summary'
     }
     
     expected_narrators_columns = {
-        'narrator_id', 'narrator_name', 'voice_sample_path', 'voice_model',
-        'language', 'gender', 'description', 'active', 'created_at'
+        'narrator_id', 'narrator_name', 'gender', 'sample_filepath', 'language', 'accent'
     }
     
-    expected_audiobook_production_columns = {
-        'id', 'book_id', 'narrator_id', 'status', 'parse_novel_status',
-        'parse_novel_completed_at', 'metadata_status', 'metadata_completed_at',
-        'total_chapters', 'total_chunks', 'total_words', 'audio_generation_status',
-        'audio_generation_completed_at', 'audio_jobs_completed', 'total_audio_files',
-        'audio_duration_seconds', 'audio_file_size_bytes', 'audio_files_moved_status',
-        'audio_files_moved_completed_at', 'audio_combination_planned_status',
-        'audio_combination_planned_completed_at', 'audio_combination_status',
-        'audio_combination_completed_at', 'image_prompts_status', 'image_prompts_started_at',
-        'image_prompts_completed_at', 'image_jobs_generation_status',
-        'image_jobs_generation_completed_at', 'image_jobs_completed', 'total_image_jobs',
-        'image_generation_status', 'image_generation_completed_at',
-        'subtitle_generation_status', 'subtitle_generation_completed_at',
-        'video_generation_status', 'video_generation_started_at',
-        'video_generation_completed_at', 'total_videos_created', 'metadata',
-        'retry_count', 'max_retries', 'created_at', 'updated_at'
+    expected_audiobook_productions_columns = {
+        'audiobook_id', 'book_id', 'narrator_id', 'language', 'status', 
+        'publish_date', 'created_at', 'updated_at'
+    }
+    
+    expected_audiobook_process_events_columns = {
+        'audiobook_id', 'timestamp', 'step_number', 'status'
     }
     
     try:
@@ -91,20 +195,20 @@ def validate_database_schema(db_path: str) -> bool:
             
             print(f"✅ ComfyUI jobs table validated - {len(comfyui_columns)} columns present")
             
-            # Validate titles table
-            cursor.execute("PRAGMA table_info(titles)")
-            titles_columns = {row[1] for row in cursor.fetchall()}
+            # Validate books table
+            cursor.execute("PRAGMA table_info(books)")
+            books_columns = {row[1] for row in cursor.fetchall()}
             
-            missing = expected_titles_columns - titles_columns
+            missing = expected_books_columns - books_columns
             if missing:
-                print(f"❌ Missing columns in titles table: {missing}")
+                print(f"❌ Missing columns in books table: {missing}")
                 return False
                 
-            extra = titles_columns - expected_titles_columns
+            extra = books_columns - expected_books_columns
             if extra:
-                print(f"⚠️  Extra columns in titles table: {extra}")
+                print(f"⚠️  Extra columns in books table: {extra}")
                 
-            print(f"✅ Titles table validated - {len(titles_columns)} columns present")
+            print(f"✅ Books table validated - {len(books_columns)} columns present")
             
             # Validate narrators table
             cursor.execute("PRAGMA table_info(narrators)")
@@ -121,20 +225,35 @@ def validate_database_schema(db_path: str) -> bool:
                 
             print(f"✅ Narrators table validated - {len(narrators_columns)} columns present")
             
-            # Validate audiobook_production table
-            cursor.execute("PRAGMA table_info(audiobook_production)")
-            audiobook_columns = {row[1] for row in cursor.fetchall()}
+            # Validate audiobook_productions table
+            cursor.execute("PRAGMA table_info(audiobook_productions)")
+            productions_columns = {row[1] for row in cursor.fetchall()}
             
-            missing = expected_audiobook_production_columns - audiobook_columns
+            missing = expected_audiobook_productions_columns - productions_columns
             if missing:
-                print(f"❌ Missing columns in audiobook_production table: {missing}")
+                print(f"❌ Missing columns in audiobook_productions table: {missing}")
                 return False
                 
-            extra = audiobook_columns - expected_audiobook_production_columns  
+            extra = productions_columns - expected_audiobook_productions_columns  
             if extra:
-                print(f"⚠️  Extra columns in audiobook_production table: {extra}")
+                print(f"⚠️  Extra columns in audiobook_productions table: {extra}")
             
-            print(f"✅ Audiobook production table validated - {len(audiobook_columns)} columns present")
+            print(f"✅ Audiobook productions table validated - {len(productions_columns)} columns present")
+            
+            # Validate audiobook_process_events table
+            cursor.execute("PRAGMA table_info(audiobook_process_events)")
+            events_columns = {row[1] for row in cursor.fetchall()}
+            
+            missing = expected_audiobook_process_events_columns - events_columns
+            if missing:
+                print(f"❌ Missing columns in audiobook_process_events table: {missing}")
+                return False
+                
+            extra = events_columns - expected_audiobook_process_events_columns
+            if extra:
+                print(f"⚠️  Extra columns in audiobook_process_events table: {extra}")
+                
+            print(f"✅ Audiobook process events table validated - {len(events_columns)} columns present")
             
             # Check WAL mode
             cursor.execute("PRAGMA journal_mode")
@@ -211,9 +330,9 @@ def main():
         print("\n📁 Creating directory structure...")
         create_directories(config)
         
-        # Initialize database
+        # Initialize database with complete schema
         print(f"\n📊 Initializing database: {db_path}")
-        init_db(db_path)
+        create_database_schema(db_path)
         
         # Validate database schema
         print("\n🔍 Validating database schema...")

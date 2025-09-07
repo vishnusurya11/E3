@@ -24,14 +24,14 @@ E3 uses a normalized relational database design optimized for scalable content m
 ```mermaid
 erDiagram
     TITLES {
-        string book_id PK "e.g., 'pg98', 'pg123'"
+        integer id PK "Auto-increment primary key"
+        string book_id UK "Business identifier e.g., 'pg98', 'pg123'"
         string title "Book/Novel/Story name"
         string author "Author name"
         string genre "fiction, non-fiction, sci-fi, etc."
         string language "en, es, fr, etc."
         integer publication_year "Year published"
         string source_url "Project Gutenberg, etc."
-        string input_file_path "Path to source file"
         boolean audiobook_complete "Is audiobook done?"
         string audiobook_narrator_id FK "Default narrator"
         datetime created_at "Record creation time"

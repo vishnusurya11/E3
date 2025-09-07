@@ -674,10 +674,10 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
     
     # Find all chapter anchors (including prologue and CH pattern)
     # Look for both <a> tags with id and headings with id (like <h2 id="CH1">)
-    anchors = soup.find_all('a', id=re.compile(r'^(chap|prol|CH)\d+'))
+    anchors = soup.find_all('a', id=re.compile(r'^(chap|prol|CH|c)\d+'))
     if not anchors:
         # Also check for headings with these IDs (for pg61262 style)
-        headings_with_id = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], id=re.compile(r'^(chap|prol|CH)\d+'))
+        headings_with_id = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], id=re.compile(r'^(chap|prol|CH|c)\d+'))
         anchors = headings_with_id
     
     if not anchors:
@@ -808,13 +808,38 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
         # Find the chapter div that contains this anchor
         chapter_div = anchor.find_parent('div', class_='chapter')
         if chapter_div:
-            # Collect all paragraphs within this chapter div
-            for p in chapter_div.find_all('p'):
-                text = p.get_text(separator=' ', strip=True)
-                if text:
-                    cleaned = clean_text(text)
-                    if cleaned:
-                        paragraphs.append(cleaned)
+            # For Tom Sawyer style: paragraphs are AFTER the chapter div, not inside
+            # Start collecting from the chapter div and look for paragraphs that follow
+            current = chapter_div.find_next_sibling()
+            
+            while current:
+                # Stop if we hit the next chapter
+                if (current.name == 'div' and current.get('class') == ['chapter']) or \
+                   (current.name in ['h1', 'h2'] and 'CHAPTER' in current.get_text().upper()):
+                    break
+                    
+                # Skip image divs
+                if current.name == 'div' and current.get('class') == ['fig']:
+                    current = current.find_next_sibling()
+                    continue
+                
+                # Collect paragraph content
+                if current.name == 'p':
+                    text = current.get_text(separator=' ', strip=True)
+                    if text:
+                        cleaned = clean_text(text)
+                        if cleaned:
+                            paragraphs.append(cleaned)
+                elif current.name == 'div':
+                    # Check for paragraphs inside divs
+                    for p in current.find_all('p'):
+                        text = p.get_text(separator=' ', strip=True)
+                        if text:
+                            cleaned = clean_text(text)
+                            if cleaned:
+                                paragraphs.append(cleaned)
+                
+                current = current.find_next_sibling()
         else:
             # Fallback: collect paragraphs after heading until next chapter
             if anchor.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
@@ -1070,8 +1095,8 @@ def parse_gutenberg_html_tts(
 
 def save_individual_tts_chapters(book_data: Dict, output_dir: str):
     """Save each chapter as a separate TTS-ready JSON file."""
-    book_name = Path(book_data['metadata']['file']).stem
-    book_dir = Path(output_dir) / book_name
+    # Output directly to chapters folder (no extra subfolder)
+    book_dir = Path(output_dir)
     book_dir.mkdir(parents=True, exist_ok=True)
     
     # Save metadata

@@ -1,0 +1,256 @@
+2025-09-07T10:31:31|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:31:31|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:31:31|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:31:31|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:31:31|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:31:31|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:31:31|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:31:31|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:31:31|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:32:36|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:32:36|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:32:36|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:32:36|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:32:36|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:32:36|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:32:36|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:32:36|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:32:36|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:32:38|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:32:38|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:32:38|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:32:38|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:32:38|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:32:38|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:32:38|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:32:38|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:32:38|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:33:49|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:33:49|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:33:49|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:33:49|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:33:49|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:33:49|20250907120001|pg23731|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:33:49|20250907120001|pg23731|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:33:49|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:33:49|20250907120100|pg74|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:33:49|20250907120100|pg74|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:33:49|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:33:50|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:33:50|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:33:50|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:33:50|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:33:50|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:33:50|20250907120001|pg23731|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:33:50|20250907120001|pg23731|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:33:50|20250907120001|pg23731|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:33:50|20250907120001|pg23731|STEP1_parsing|PROGRESS|Input: foundry/pg23731\pg23731.html | Output: foundry/pg23731/eng/chapters
+2025-09-07T10:33:50|20250907120001|pg23731|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:33:50|20250907120001|pg23731|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:33:50|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:33:50|20250907120100|pg74|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:33:50|20250907120100|pg74|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:33:50|20250907120100|pg74|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:33:50|20250907120100|pg74|STEP1_parsing|PROGRESS|Input: foundry/pg74\pg74-images.html | Output: foundry/pg74/eng/chapters
+2025-09-07T10:33:50|20250907120100|pg74|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:33:50|20250907120100|pg74|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:33:50|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:33:51|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:33:51|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:33:51|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:33:51|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:33:51|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:33:51|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:33:51|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:33:51|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:33:51|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:33:52|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:33:52|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:33:52|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:33:52|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:33:52|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:33:52|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:33:52|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:33:52|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:33:52|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:34:14|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:34:14|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:34:14|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:34:14|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:34:14|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:34:14|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:14|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:34:14|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:14|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:34:15|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:34:15|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:34:15|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:34:15|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:34:15|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:34:15|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:15|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:34:15|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:15|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:34:16|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:34:16|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:34:16|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:34:16|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:34:16|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:34:16|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:16|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:34:16|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:16|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:34:17|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:34:17|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:34:17|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:34:17|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:34:17|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:34:17|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:17|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:34:17|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:17|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:34:18|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:34:18|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:34:18|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:34:18|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:34:18|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:34:18|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:18|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:34:18|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:34:18|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:35:06|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:35:06|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:35:06|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:35:06|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:35:06|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:35:06|20250907120001|pg23731|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:35:06|20250907120001|pg23731|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:35:06|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:35:06|20250907120100|pg74|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:35:06|20250907120100|pg74|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:35:06|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:35:16|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:35:16|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:35:16|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:35:16|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:35:16|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:35:16|20250907120001|pg23731|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:35:16|20250907120001|pg23731|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:35:16|20250907120001|pg23731|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:35:16|20250907120001|pg23731|STEP1_parsing|PROGRESS|Input: foundry/pg23731\pg23731.html | Output: foundry/pg23731/eng/chapters
+2025-09-07T10:35:16|20250907120001|pg23731|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:35:16|20250907120001|pg23731|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:35:16|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:35:16|20250907120100|pg74|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:35:16|20250907120100|pg74|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:35:16|20250907120100|pg74|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:35:16|20250907120100|pg74|STEP1_parsing|PROGRESS|Input: foundry/pg74\pg74-images.html | Output: foundry/pg74/eng/chapters
+2025-09-07T10:35:16|20250907120100|pg74|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:35:16|20250907120100|pg74|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:35:16|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:36:14|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:36:14|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:36:14|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:36:14|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:36:14|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:36:14|20250907120001|pg23731|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:36:14|20250907120001|pg23731|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:36:14|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:36:14|20250907120100|pg74|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:36:14|20250907120100|pg74|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:36:14|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:36:19|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:36:19|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:36:19|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:36:19|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:36:19|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:36:19|20250907120001|pg23731|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:36:19|20250907120001|pg23731|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:36:19|20250907120001|pg23731|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:36:19|20250907120001|pg23731|STEP1_parsing|PROGRESS|Input: foundry/pg23731\pg23731.html | Output: foundry/pg23731/eng/chapters
+2025-09-07T10:36:19|20250907120001|pg23731|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:36:19|20250907120001|pg23731|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:36:19|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:36:19|20250907120100|pg74|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:36:19|20250907120100|pg74|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:36:19|20250907120100|pg74|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:36:19|20250907120100|pg74|STEP1_parsing|PROGRESS|Input: foundry/pg74\pg74-images.html | Output: foundry/pg74/eng/chapters
+2025-09-07T10:36:19|20250907120100|pg74|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:36:19|20250907120100|pg74|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:36:19|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:36:23|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:36:23|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:36:23|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:36:23|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:36:23|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:36:23|20250907120001|pg23731|STEP2_metadata|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:36:23|20250907120001|pg23731|STEP2_metadata|STARTING|Metadata addition execution initiated
+2025-09-07T10:36:23|20250907120001|pg23731|STEP2_metadata|PROCESSING|Metadata addition execution started
+2025-09-07T10:36:23|20250907120001|pg23731|STEP2_metadata|SUCCESS|Book metadata added to first chunk
+2025-09-07T10:36:23|20250907120001|pg23731|STEP2_metadata|SUCCESS|Metadata addition completed - STEP3_create_audio_jobs queued
+2025-09-07T10:36:23|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:36:23|20250907120100|pg74|STEP2_metadata|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:36:23|20250907120100|pg74|STEP2_metadata|STARTING|Metadata addition execution initiated
+2025-09-07T10:36:24|20250907120100|pg74|STEP2_metadata|PROCESSING|Metadata addition execution started
+2025-09-07T10:36:24|20250907120100|pg74|STEP2_metadata|SUCCESS|Book metadata added to first chunk
+2025-09-07T10:36:24|20250907120100|pg74|STEP2_metadata|SUCCESS|Metadata addition completed - STEP3_create_audio_jobs queued
+2025-09-07T10:36:24|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:36:28|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:36:28|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:36:28|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:36:28|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:36:28|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:36:28|20250907120001|pg23731|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:36:28|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:36:28|20250907120100|pg74|STEP3_create_audio_jobs|STATUS|Current state: PENDING | Total events: 7
+2025-09-07T10:36:28|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:41:04|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:41:04|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:41:04|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:41:04|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:41:04|SYSTEM|PROCESSING|INFO|Processing 2 audiobooks in chronological order
+2025-09-07T10:41:04|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:41:04|20250907120001|pg23731|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:41:04|20250907120001|pg23731|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:41:04|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:41:04|20250907120100|pg74|STEP1_parsing|QUEUING|No events found - queuing STEP1_parsing
+2025-09-07T10:41:04|20250907120100|pg74|STEP1_parsing|QUEUED|Added STEP1_parsing event
+2025-09-07T10:41:04|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:41:09|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:41:09|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:41:09|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:41:09|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:41:09|SYSTEM|PROCESSING|INFO|Processing 2 audiobooks in chronological order
+2025-09-07T10:41:09|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:41:09|20250907120001|pg23731|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:41:09|20250907120001|pg23731|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:41:09|20250907120001|pg23731|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:41:09|20250907120001|pg23731|STEP1_parsing|PROGRESS|Input: foundry/pg23731\pg23731.html | Output: foundry/pg23731/eng/chapters
+2025-09-07T10:41:09|20250907120001|pg23731|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:41:09|20250907120001|pg23731|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:41:09|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:41:09|20250907120100|pg74|STEP1_parsing|STATUS|Current state: PENDING | Total events: 1
+2025-09-07T10:41:09|20250907120100|pg74|STEP1_parsing|STARTING|Novel parsing execution initiated
+2025-09-07T10:41:09|20250907120100|pg74|STEP1_parsing|PROCESSING|Novel parsing execution started
+2025-09-07T10:41:09|20250907120100|pg74|STEP1_parsing|PROGRESS|Input: foundry/pg74\pg74-images.html | Output: foundry/pg74/eng/chapters
+2025-09-07T10:41:09|20250907120100|pg74|STEP1_parsing|SUCCESS|Parsed 0 chapters, 0 chunks, 0 words
+2025-09-07T10:41:09|20250907120100|pg74|STEP1_parsing|SUCCESS|Novel parsing completed - STEP3_create_audio_jobs queued
+2025-09-07T10:41:09|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished
+2025-09-07T10:41:14|SYSTEM|STEP0_queue|STARTING|Getting processing queue
+2025-09-07T10:41:14|SYSTEM|STEP0_queue|SUCCESS|Found 2 productions to process
+2025-09-07T10:41:14|20250907120001|pg23731|STEP0_queue|INFO|Book: A MARTIAN ODYSSEY by Stanley G. Weinbaum - Status: pending
+2025-09-07T10:41:14|20250907120100|pg74|STEP0_queue|INFO|Book: The Adventures of Tom Sawyer by Mark Twain - Status: pending
+2025-09-07T10:41:14|SYSTEM|PROCESSING|INFO|Processing 2 audiobooks in chronological order
+2025-09-07T10:41:14|20250907120001|pg23731|PROCESSING|STARTING|Processing audiobook: A MARTIAN ODYSSEY
+2025-09-07T10:41:14|20250907120001|pg23731|STEP2_metadata|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:41:14|20250907120001|pg23731|STEP2_metadata|STARTING|Metadata addition execution initiated
+2025-09-07T10:41:14|20250907120001|pg23731|STEP2_metadata|PROCESSING|Metadata addition execution started
+2025-09-07T10:41:14|20250907120001|pg23731|STEP2_metadata|SUCCESS|Book metadata added to first chunk
+2025-09-07T10:41:14|20250907120001|pg23731|STEP2_metadata|SUCCESS|Metadata addition completed - STEP3_create_audio_jobs queued
+2025-09-07T10:41:14|20250907120100|pg74|PROCESSING|STARTING|Processing audiobook: The Adventures of Tom Sawyer
+2025-09-07T10:41:14|20250907120100|pg74|STEP2_metadata|STATUS|Current state: PENDING | Total events: 4
+2025-09-07T10:41:14|20250907120100|pg74|STEP2_metadata|STARTING|Metadata addition execution initiated
+2025-09-07T10:41:14|20250907120100|pg74|STEP2_metadata|PROCESSING|Metadata addition execution started
+2025-09-07T10:41:14|20250907120100|pg74|STEP2_metadata|SUCCESS|Book metadata added to first chunk
+2025-09-07T10:41:14|20250907120100|pg74|STEP2_metadata|SUCCESS|Metadata addition completed - STEP3_create_audio_jobs queued
+2025-09-07T10:41:14|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished

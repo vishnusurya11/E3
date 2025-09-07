@@ -24,9 +24,9 @@ from enum import Enum
 # Configuration
 MAX_HOURS_PER_PART = 10  # Maximum hours per audiobook part (configurable for YouTube limits)
 
-from parse_novel_tts import parse_novel
-from create_tts_audio_jobs import create_tts_jobs
-from audiobook_helper import get_all_books, get_processable_books, update_book_record, log_simple, mark_stage_completed, mark_stage_failed
+from .parse_novel_tts import parse_novel
+from .create_tts_audio_jobs import create_tts_jobs
+from .audiobook_helper import get_all_books, get_processable_books, update_book_record, log_simple, mark_stage_completed, mark_stage_failed
 
 
 ################################################################################
@@ -630,7 +630,7 @@ def generate_subtitles_for_book_pipeline(book_dict: Dict) -> bool:
     
     try:
         # Import the function we just refactored
-        from generate_subtitles import generate_subtitles_for_book
+        from .generate_subtitles import generate_subtitles_for_book
         
         # Generate subtitles using our reusable function
         result = generate_subtitles_for_book(
@@ -723,7 +723,7 @@ def combine_audio_for_book_pipeline(book_dict: Dict) -> bool:
         print(f"Using combination plan: {combination_plan['parts_needed']} parts, {combination_plan['total_duration_hours']:.2f} hours")
         
         # Import the function we just refactored
-        from simple_ffmpeg_combine import combine_audio_for_book
+        from .simple_ffmpeg_combine import combine_audio_for_book
         
         # Combine audio using our reusable function with Step 7 plan
         result = combine_audio_for_book(
@@ -798,7 +798,7 @@ def generate_image_prompts_for_book_pipeline(book_dict: Dict) -> bool:
     
     try:
         # Import and call the image prompt generation function
-        from generate_image_prompts import generate_image_prompts_for_book
+        from .generate_image_prompts import generate_image_prompts_for_book
         
         metadata_file_path = f"foundry/processing/{book_id}/metadata.json"
         
@@ -909,7 +909,7 @@ def create_image_jobs_for_book_pipeline(book_dict: Dict) -> bool:
     
     try:
         # Import and call the image job creation function
-        from create_image_jobs import create_image_jobs_for_book
+        from .create_image_jobs import create_image_jobs_for_book
         
         result = create_image_jobs_for_book(
             book_id=book_id,
@@ -1007,7 +1007,7 @@ def check_image_jobs_completion_pipeline(book_dict: Dict) -> bool:
     
     try:
         # Import and use the image job checker
-        from check_image_jobs import check_image_jobs_completion
+        from .check_image_jobs import check_image_jobs_completion
         
         result = check_image_jobs_completion(book_id, verbose=True)
         
@@ -1094,7 +1094,7 @@ def generate_videos_for_book_pipeline(book_dict: Dict) -> bool:
     
     try:
         # Import and call the video generation function
-        from generate_videos import generate_videos_for_book
+        from .generate_videos import generate_videos_for_book
         
         result = generate_videos_for_book(
             book_id=book_id,

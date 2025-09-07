@@ -32,6 +32,10 @@ def configure_wal_mode(db_path: str) -> None:
         conn.execute("PRAGMA synchronous=NORMAL")
         # Set WAL checkpoint size
         conn.execute("PRAGMA wal_autocheckpoint=1000")
+        # Additional read/write optimization
+        conn.execute("PRAGMA read_uncommitted=TRUE")   # Allow dirty reads (faster)
+        conn.execute("PRAGMA temp_store=MEMORY")       # Store temp tables in memory  
+        conn.execute("PRAGMA mmap_size=268435456")     # 256MB memory mapping
         conn.commit()
 
 
@@ -100,101 +104,57 @@ def init_db(db_path: str) -> None:
             )
         """)
         
-        # Create normalized titles table (Master content catalog)
+        # Create books table (Book Catalog from AUDIOBOOK_CLI_PLAN.md)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS titles (
-                book_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                author TEXT,
-                genre TEXT,
-                language TEXT DEFAULT 'en',
-                publication_year INTEGER,
-                source_url TEXT,
-                input_file_path TEXT NOT NULL,
-                audiobook_complete BOOLEAN DEFAULT false,
-                audiobook_narrator_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                FOREIGN KEY (audiobook_narrator_id) REFERENCES narrators(narrator_id)
+            CREATE TABLE IF NOT EXISTS books (
+                id VARCHAR(14) PRIMARY KEY,
+                book_id VARCHAR(20) UNIQUE NOT NULL,
+                book_name VARCHAR(255) NOT NULL,
+                author VARCHAR(255),
+                language CHAR(3) NOT NULL,
+                year_published INTEGER,
+                genre VARCHAR(100),
+                summary TEXT
             )
         """)
         
-        # Create narrators table (Voice talent profiles)
+        # Create narrators table (Voice Talent Registry from AUDIOBOOK_CLI_PLAN.md)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS narrators (
-                narrator_id TEXT PRIMARY KEY,
-                narrator_name TEXT NOT NULL,
-                voice_sample_path TEXT,
-                voice_model TEXT NOT NULL,
-                language TEXT DEFAULT 'en',
-                gender TEXT,
-                description TEXT,
-                active BOOLEAN DEFAULT true,
-                created_at TEXT NOT NULL
+                narrator_id VARCHAR(100) PRIMARY KEY,
+                narrator_name VARCHAR(255) NOT NULL,
+                gender VARCHAR(20),
+                sample_filepath VARCHAR(500),
+                language CHAR(3) NOT NULL,
+                accent VARCHAR(50)
             )
         """)
         
-        # Create audiobook production table (Workflow status tracking)
+        # Create audiobook_productions table (Generation Master from AUDIOBOOK_CLI_PLAN.md)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audiobook_production (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                book_id TEXT NOT NULL,
-                narrator_id TEXT NOT NULL,
-                status TEXT DEFAULT 'pending',
-                
-                -- Step 1: Parse Novel
-                parse_novel_status TEXT DEFAULT 'pending',
-                parse_novel_completed_at TEXT,
-                metadata_status TEXT DEFAULT 'pending',
-                metadata_completed_at TEXT,
-                total_chapters INTEGER DEFAULT 0,
-                total_chunks INTEGER DEFAULT 0,
-                total_words INTEGER DEFAULT 0,
-                
-                -- Step 2: Audio Generation  
-                audio_generation_status TEXT DEFAULT 'pending',
-                audio_generation_completed_at TEXT,
-                audio_jobs_completed INTEGER DEFAULT 0,
-                total_audio_files INTEGER DEFAULT 0,
-                audio_duration_seconds INTEGER DEFAULT 0,
-                audio_file_size_bytes INTEGER DEFAULT 0,
-                audio_files_moved_status TEXT DEFAULT 'pending',
-                audio_files_moved_completed_at TEXT,
-                audio_combination_planned_status TEXT DEFAULT 'pending',
-                audio_combination_planned_completed_at TEXT,
-                audio_combination_status TEXT DEFAULT 'pending',
-                audio_combination_completed_at TEXT,
-                
-                -- Step 3: Image Generation
-                image_prompts_status TEXT DEFAULT 'pending',
-                image_prompts_started_at TEXT,
-                image_prompts_completed_at TEXT,
-                image_jobs_generation_status TEXT DEFAULT 'pending', 
-                image_jobs_generation_completed_at TEXT,
-                image_jobs_completed INTEGER DEFAULT 0,
-                total_image_jobs INTEGER DEFAULT 0,
-                image_generation_status TEXT DEFAULT 'pending',
-                image_generation_completed_at TEXT,
-                
-                -- Step 4: Subtitle Generation
-                subtitle_generation_status TEXT DEFAULT 'pending',
-                subtitle_generation_completed_at TEXT,
-                
-                -- Step 5: Video Generation
-                video_generation_status TEXT DEFAULT 'pending',
-                video_generation_started_at TEXT DEFAULT 'pending',
-                video_generation_completed_at TEXT,
-                total_videos_created INTEGER DEFAULT 0,
-                
-                -- Metadata & Control
-                metadata TEXT,
-                retry_count INTEGER DEFAULT 0,
-                max_retries INTEGER DEFAULT 3,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                
-                FOREIGN KEY (book_id) REFERENCES titles(book_id),
+            CREATE TABLE IF NOT EXISTS audiobook_productions (
+                audiobook_id VARCHAR(14) PRIMARY KEY,
+                book_id VARCHAR(20) NOT NULL,
+                narrator_id VARCHAR(100) NOT NULL,
+                language CHAR(3) NOT NULL,
+                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
+                publish_date TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (book_id) REFERENCES books(book_id),
                 FOREIGN KEY (narrator_id) REFERENCES narrators(narrator_id)
+            )
+        """)
+        
+        # Create audiobook_process_events table (Pipeline Tracker from AUDIOBOOK_CLI_PLAN.md)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audiobook_process_events (
+                audiobook_id VARCHAR(14) NOT NULL,
+                timestamp TIMESTAMP NOT NULL,
+                step_number VARCHAR(100) NOT NULL,
+                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
+                PRIMARY KEY (audiobook_id, timestamp),
+                FOREIGN KEY (audiobook_id) REFERENCES audiobook_productions(audiobook_id)
             )
         """)
         
@@ -215,6 +175,11 @@ def init_db(db_path: str) -> None:
         """)
         
         # Create indices for titles table performance
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_titles_book_id
+            ON titles(book_id)
+        """)
+        
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_titles_audiobook_complete
             ON titles(audiobook_complete)

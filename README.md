@@ -117,6 +117,39 @@ source .venv/bin/activate
 python -m comfyui_agent.cli start --ui-port 8080
 ```
 
+## Run Audiobook Agent
+
+### Check Titles Status
+```bash
+# Activate virtual environment first
+source .venv/bin/activate  # Linux/WSL
+# OR
+.venv\Scripts\activate     # Windows
+
+# Check audiobook titles and completion status
+python audiobook_agent/audiobook_cli.py
+```
+
+### Add Test Book to Database
+```sql
+-- Connect to database and add a test book
+sqlite3 database/alpha_e3_agent.db
+INSERT INTO titles (
+    book_id, title, author, genre, language, 
+    audiobook_complete, created_at, updated_at
+) VALUES (
+    'pg74',
+    'The Adventures of Tom Sawyer', 
+    'Mark Twain',
+    'fiction',
+    'en',
+    false,
+    datetime('now'),
+    datetime('now')
+);
+.quit
+```
+
 ## Submit Job
 Copy a sample YAML to processing folder:
 
