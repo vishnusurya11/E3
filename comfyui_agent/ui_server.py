@@ -27,7 +27,7 @@ try:
     if parent_dir not in sys.path:
         sys.path.append(parent_dir)
     
-    from audiobook_helper import get_all_books
+    from audiobook_agent.audiobook_helper import get_all_books
     print("✅ Audiobook helper functions imported successfully")
     
     # Test database access

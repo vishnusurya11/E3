@@ -24,7 +24,8 @@ def create_chunk_job(
     chapter_title: str,
     jobs_output_dir: str,
     finished_audio_dir: str,
-    voice_sample: str
+    voice_sample: str,
+    audiobook_dict: dict = None
 ) -> str:
     """
     Create a single YAML job configuration for a TTS chunk.
@@ -40,8 +41,13 @@ def create_chunk_job(
     Returns:
         Path to created YAML file
     """
-    # Create clean book ID (remove -images suffix if present)
-    clean_book_id = book_id.replace('-images', '')
+    # Use audiobook_dict if available  
+    if audiobook_dict:
+        clean_book_id = audiobook_dict['book_id']
+        env = os.getenv('E3_ENV', 'prod')
+    else:
+        clean_book_id = book_id.replace('-images', '')  # Fallback for legacy calls
+        env = os.getenv('E3_ENV', 'prod')
     
     # Generate filename: SPEECH_[book]_[index]_ch[chapter]_chunk[chunk_id].yaml
     # Use chapter index as the integer index required by validation
@@ -55,10 +61,10 @@ def create_chunk_job(
         "inputs": {
             "10_text": chunk["text"],
             "6_audio": voice_sample,
-            "9_filename_prefix": f"speech/{clean_book_id}/ch{chapter_index:03d}/chunk{chunk['chunk_id']:03d}/audio"
+            "9_filename_prefix": f"speech/{env}/{clean_book_id}/ch{chapter_index:03d}/chunk{chunk['chunk_id']:03d}/audio"
         },
         "outputs": {
-            "file_path": f"{finished_audio_dir}/{clean_book_id}_ch{chapter_index:03d}_chunk{chunk['chunk_id']:03d}.wav"
+            "file_path": f"{finished_audio_dir}/{env}_{clean_book_id}_ch{chapter_index:03d}_chunk{chunk['chunk_id']:03d}.wav"
         },
         "metadata": {
             "book_title": book_metadata.get("book_title", "Unknown"),
@@ -82,7 +88,7 @@ def create_chunk_job(
     return filepath
 
 
-def process_book(book_path: Path, jobs_output_dir: str, finished_audio_dir: str, voice_sample: str) -> int:
+def process_book(book_path: Path, jobs_output_dir: str, finished_audio_dir: str, voice_sample: str, audiobook_dict: dict = None) -> int:
     """
     Process all chapters in a book directory.
     
@@ -147,7 +153,8 @@ def process_book(book_path: Path, jobs_output_dir: str, finished_audio_dir: str,
                 chapter_title=chapter_title,
                 jobs_output_dir=jobs_output_dir,
                 finished_audio_dir=finished_audio_dir,
-                voice_sample=voice_sample
+                voice_sample=voice_sample,
+                audiobook_dict=audiobook_dict
             )
             total_jobs += 1
             
@@ -167,7 +174,8 @@ def create_tts_jobs(
     finished_audio_dir: str = "comfyui_jobs/finished/speech",
     voice_sample: str = None,
     book_filter: str = None,
-    verbose: bool = True
+    verbose: bool = True,
+    audiobook_dict: dict = None
 ) -> Dict:
     """
     Create ComfyUI TTS job files from parsed novel chunks.
@@ -201,6 +209,8 @@ def create_tts_jobs(
     # Use default voice sample if none provided
     if voice_sample is None:
         voice_sample = DEFAULT_VOICE_SAMPLE
+    
+    # audiobook_dict is now passed to helper functions directly
     
     # Determine processing mode and get book directories
     if input_book_dir:
@@ -273,7 +283,7 @@ def create_tts_jobs(
     
     for book_path in sorted(book_dirs):
         try:
-            jobs_created = process_book(book_path, jobs_output_dir, finished_audio_dir, voice_sample)
+            jobs_created = process_book(book_path, jobs_output_dir, finished_audio_dir, voice_sample, audiobook_dict)
             total_jobs_created += jobs_created
             
             processed_books.append({

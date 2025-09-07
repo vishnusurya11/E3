@@ -64,173 +64,17 @@ def get_db_connection(db_path: str):
 
 
 def init_db(db_path: str) -> None:
-    """Initialize database schema and indices with WAL mode.
+    """Initialize database schema - delegates to initialize.py.
     
-    Creates both comfyui_jobs and audiobook_processing tables with all required 
-    columns and indices. Configures WAL mode for concurrent access.
-    Idempotent - safe to call multiple times.
+    Schema creation is now handled by initialize.py for complete workspace setup.
+    This function maintained for backward compatibility.
     
     Args:
         db_path: Path to SQLite database file.
-        
-    Examples:
-        >>> init_db("database/e3_agent.db")
     """
-    # Configure WAL mode first
-    configure_wal_mode(db_path)
-    
-    with get_db_connection(db_path) as conn:
-        cursor = conn.cursor()
-        
-        # Create ComfyUI jobs table (renamed from 'jobs')
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS comfyui_jobs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                config_name TEXT NOT NULL UNIQUE,
-                job_type TEXT NOT NULL,
-                workflow_id TEXT NOT NULL,
-                priority INTEGER DEFAULT 50,
-                status TEXT CHECK(status IN ('pending','processing','done','failed')) NOT NULL,
-                run_count INTEGER DEFAULT 0,
-                retries_attempted INTEGER DEFAULT 0,
-                retry_limit INTEGER DEFAULT 2,
-                start_time TEXT,
-                end_time TEXT,
-                duration REAL,
-                error_trace TEXT,
-                metadata TEXT,
-                worker_id TEXT,
-                lease_expires_at TEXT
-            )
-        """)
-        
-        # Create books table (Book Catalog from AUDIOBOOK_CLI_PLAN.md)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS books (
-                id VARCHAR(14) PRIMARY KEY,
-                book_id VARCHAR(20) UNIQUE NOT NULL,
-                book_name VARCHAR(255) NOT NULL,
-                author VARCHAR(255),
-                language CHAR(3) NOT NULL,
-                year_published INTEGER,
-                genre VARCHAR(100),
-                summary TEXT
-            )
-        """)
-        
-        # Create narrators table (Voice Talent Registry from AUDIOBOOK_CLI_PLAN.md)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS narrators (
-                narrator_id VARCHAR(100) PRIMARY KEY,
-                narrator_name VARCHAR(255) NOT NULL,
-                gender VARCHAR(20),
-                sample_filepath VARCHAR(500),
-                language CHAR(3) NOT NULL,
-                accent VARCHAR(50)
-            )
-        """)
-        
-        # Create audiobook_productions table (Generation Master from AUDIOBOOK_CLI_PLAN.md)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audiobook_productions (
-                audiobook_id VARCHAR(14) PRIMARY KEY,
-                book_id VARCHAR(20) NOT NULL,
-                narrator_id VARCHAR(100) NOT NULL,
-                language CHAR(3) NOT NULL,
-                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
-                publish_date TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (book_id) REFERENCES books(book_id),
-                FOREIGN KEY (narrator_id) REFERENCES narrators(narrator_id)
-            )
-        """)
-        
-        # Create audiobook_process_events table (Pipeline Tracker from AUDIOBOOK_CLI_PLAN.md)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audiobook_process_events (
-                audiobook_id VARCHAR(14) NOT NULL,
-                timestamp TIMESTAMP NOT NULL,
-                step_number VARCHAR(100) NOT NULL,
-                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
-                PRIMARY KEY (audiobook_id, timestamp),
-                FOREIGN KEY (audiobook_id) REFERENCES audiobook_productions(audiobook_id)
-            )
-        """)
-        
-        # Create indices for ComfyUI jobs performance
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_status_priority
-            ON comfyui_jobs(status, priority)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_started
-            ON comfyui_jobs(start_time)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_config_name
-            ON comfyui_jobs(config_name)
-        """)
-        
-        # Create indices for titles table performance
-        cursor.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_titles_book_id
-            ON titles(book_id)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_titles_audiobook_complete
-            ON titles(audiobook_complete)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_titles_genre
-            ON titles(genre)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_titles_author
-            ON titles(author)
-        """)
-        
-        # Create indices for narrators table performance
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_narrators_active
-            ON narrators(active)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_narrators_language
-            ON narrators(language)
-        """)
-        
-        # Create indices for audiobook production performance
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audiobook_book_id
-            ON audiobook_production(book_id)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audiobook_narrator_id
-            ON audiobook_production(narrator_id)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audiobook_status
-            ON audiobook_production(status)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audiobook_workflow_status
-            ON audiobook_production(parse_novel_status, audio_generation_status, video_generation_status)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audiobook_created
-            ON audiobook_production(created_at)
-        """)
+    # All schema creation is now handled by initialize.py
+    # This function kept for backward compatibility with existing code
+    pass
 
 
 def upsert_job(db_path: str, job_data: Dict[str, Any]) -> int:
