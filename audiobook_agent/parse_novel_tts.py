@@ -537,11 +537,44 @@ def extract_chapters_strategy_h2_sequential(soup: BeautifulSoup) -> List[Dict]:
         if h2.get('id') in ['pg-header-heading', 'pg-footer-heading']:
             continue
         
-        anchor = h2.find('a', id=re.compile(r'chap\d+'))
-        if not anchor and not any(word in h2.get_text().upper() for word in ['CHAPTER', 'ACT', 'SCENE', 'PART', 'BOOK']):
-            text = h2.get_text().strip()
-            if not re.match(r'^[IVX]+\.?(\s|$)|^\d+\.?(\s|$)', text):
-                continue
+        # Check for various types of anchors (not just chap\d+)
+        anchor = h2.find('a', id=True)
+        story_anchor = anchor and anchor.get('id') if anchor else None
+
+        # Detect if this appears to be a story collection
+        title_text = soup.find('title')
+        is_story_collection = title_text and any(word in title_text.get_text().upper()
+                                                for word in ['STORIES', 'TALES', 'COLLECTION'])
+
+        # Enhanced filtering logic for H2 tags
+        h2_text = h2.get_text().strip().upper()
+
+        # Skip if it's clearly just a collection title/header (not individual story)
+        if (story_anchor and story_anchor.upper() in ['TWENTY-FIVE_GHOST_STORIES', 'GHOST_STORIES']
+            and not any(word in h2_text for word in ['THE ', 'A ', 'AN '])):
+            continue
+
+        # Include if it has a meaningful anchor ID (suggests individual story/chapter)
+        has_meaningful_anchor = (story_anchor and
+                               len(story_anchor.replace('_', ' ').strip()) > 3 and
+                               story_anchor not in ['pg-header-heading', 'pg-footer-heading'])
+
+        # Include if it matches traditional chapter patterns
+        has_chapter_keywords = any(word in h2_text for word in ['CHAPTER', 'ACT', 'SCENE', 'PART', 'BOOK'])
+
+        # Include if it starts with Roman/Arabic numerals
+        has_numeric_pattern = re.match(r'^[IVX]+\.?(\s|$)|^\d+\.?(\s|$)', h2_text)
+
+        # Include if it's a story collection and this looks like a story title
+        is_story_title = (is_story_collection and
+                         (h2_text.startswith('THE ') or
+                          h2_text.startswith('A ') or
+                          h2_text.startswith('AN ') or
+                          has_meaningful_anchor))
+
+        # Apply the filtering logic
+        if not (has_meaningful_anchor or has_chapter_keywords or has_numeric_pattern or is_story_title):
+            continue
         
         chapter_index += 1
         title = clean_text(h2.get_text(separator=' ', strip=True))
