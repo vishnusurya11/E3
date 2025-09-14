@@ -1689,14 +1689,25 @@ Whether you're commuting, exercising, or simply relaxing, immerse yourself in th
             
             if publish_date:
                 try:
-                    # Convert from YYYYMMDDHHMMSS to YouTube ISO format
+                    # Convert from YYYYMMDDHHMMSS to YouTube UTC ISO format
                     from datetime import datetime
                     dt = datetime.strptime(publish_date, '%Y%m%d%H%M%S')
-                    # Assume Seattle time (PDT/PST) - add timezone
-                    youtube_publish_time = dt.strftime('%Y-%m-%dT%H:%M:%S-07:00')  # PDT offset
-                    print(f"   📅 Scheduled publish: {youtube_publish_time}")
+                    # Convert to UTC format with Z suffix (YouTube API requirement)
+                    youtube_publish_time = dt.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # UTC format
+
+                    # Validate that publish time is in the future
+                    from datetime import timezone
+                    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)  # Remove timezone for comparison
+                    if dt > now_utc:
+                        print(f"   📅 Scheduled publish: {youtube_publish_time} (UTC)")
+                        print(f"   ⏰ Current time: {now_utc.strftime('%Y-%m-%dT%H:%M:%S.000Z')} (UTC)")
+                    else:
+                        print(f"   ⚠️ Publish date {youtube_publish_time} is in the past - will upload immediately")
+                        youtube_publish_time = None  # Force immediate upload
+
                 except Exception as e:
                     print(f"   ⚠️ Invalid publish date format: {publish_date}, uploading as public immediately")
+                    youtube_publish_time = None
             
             # Real YouTube API upload
             try:
