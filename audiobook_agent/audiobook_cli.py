@@ -311,8 +311,25 @@ def main_single_run():
                     log_and_print(audiobook_id, book_id, "STEP11_generate_video", "FAILED", "Video generation failed")
                 elif result == "P":
                     pass  # Skip - no events, just continue to next book
+
+            elif current_step == 'STEP12_upload_video_to_youtube' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "STARTING", "YouTube upload execution initiated")
+                
+                result = execute_step12_upload_video_to_youtube(audiobook, current_status)  # Pass current status
+                
+                # Update event status based on result
+                if result == "S":
+                    add_audiobook_event(audiobook_id, 'STEP12_upload_video_to_youtube', 'success')
+                    # TODO: Add STEP13 when implemented
+                    
+                    log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "SUCCESS", "YouTube upload completed")
+                elif result == "F":
+                    add_audiobook_event(audiobook_id, 'STEP12_upload_video_to_youtube', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "FAILED", "YouTube upload failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
             
-            # TODO: Add other steps (STEP12, STEP13, etc.)
+            # TODO: Add other steps (STEP13, STEP14, etc.)
     
     timestamp = datetime.now().isoformat()
     print(f"{timestamp}|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished")
