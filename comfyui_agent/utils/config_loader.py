@@ -66,7 +66,7 @@ def load_global_config(path: str = None) -> Dict[str, Any]:
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f) or {}
-    except yaml.YAMLError as e:
+    except Exception as e:
         raise ValueError(f"Invalid YAML in config file {config_path}: {e}")
     
     # Apply environment variable interpolation
@@ -188,7 +188,7 @@ def load_workflows(path: str) -> Dict[str, Dict[str, Any]]:
     try:
         with open(path, 'r', encoding='utf-8') as f:
             workflows = yaml.safe_load(f) or {}
-    except yaml.YAMLError as e:
+    except Exception as e:
         raise ValueError(f"Invalid YAML in workflows file: {e}")
     
     # Validate each workflow entry

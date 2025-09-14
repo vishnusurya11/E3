@@ -84,7 +84,7 @@ def process_yaml_file(yaml_path: str, workflows: Dict[str, Any],
     except ValueError as e:
         result["reason"] = str(e)
         logger.warning(f"Rejected {yaml_path}: {e}")
-    except yaml.YAMLError as e:
+    except Exception as e:
         result["reason"] = f"Invalid YAML: {e}"
         logger.warning(f"Invalid YAML in {yaml_path}: {e}")
     except Exception as e:
