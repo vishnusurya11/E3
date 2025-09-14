@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "e3-comfyui-agent"
 version = "0.1.0"
@@ -5,6 +9,54 @@ description = "E3 Phase 1: ComfyUI Agent - Execution engine for AI media generat
 authors = [{name = "ViSuReNa LLC"}]
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = [
+    # Core dependencies
+    "pyyaml>=6.0",
+    "watchdog>=3.0.0",
+    "httpx>=0.24.0",
+    "websocket-client>=1.6.0",
+    "requests>=2.31.0",
+    
+    # Web framework
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "jinja2>=3.1.0",
+    
+    # AI/LLM dependencies
+    "langchain>=0.0.350",
+    "langchain-openai>=0.0.5",
+    
+    # Image processing
+    "Pillow>=10.0.0",
+    
+    # YouTube API
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.0.0", 
+    "google-auth-httplib2>=0.1.0",
+    
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "beautifulsoup4>=4.12.0",
+    "pydub>=0.25.0",
+    
+    # CLI
+    "typer>=0.9.0",
+    "rich>=13.5.0",
+    
+    # Development tools
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.11.0",
+    
+    # Additional utilities
+    "ipython>=8.0.0",
+    "glob2>=0.7",
+]
 
 [tool.black]
 line-length = 100
