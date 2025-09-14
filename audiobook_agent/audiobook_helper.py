@@ -432,7 +432,7 @@ def get_processing_queue():
             # Get all incomplete audiobook productions (from AUDIOBOOK_CLI_PLAN.md)
             cursor.execute("""
                 SELECT ap.audiobook_id, ap.book_id, ap.narrator_id, ap.status, 
-                       b.book_name, b.author, n.narrator_name, n.sample_filepath
+                       b.book_name, b.author, n.narrator_name, n.sample_filepath, ap.publish_date
                 FROM audiobook_productions ap
                 JOIN books b ON ap.book_id = b.book_id
                 JOIN narrators n ON ap.narrator_id = n.narrator_id  
@@ -1500,6 +1500,7 @@ def upload_videos_to_youtube(book_id: str, language: str, audiobook_dict: Dict) 
         # YouTube API setup
         try:
             from googleapiclient.discovery import build
+            from googleapiclient.http import MediaFileUpload
             from google.oauth2.credentials import Credentials
             from google.auth.transport.requests import Request
             import pickle
@@ -1507,11 +1508,100 @@ def upload_videos_to_youtube(book_id: str, language: str, audiobook_dict: Dict) 
             print(f"❌ YouTube API libraries not installed. Run: pip install google-api-python-client google-auth-oauthlib")
             return False
         
-        # Load YouTube credentials from environment
-        channel_id = "UCyjo8L-DEJaeGuufUqMpigw"
+        # Load YouTube channel ID from environment
+        channel_id = os.getenv('YOUTUBE_CHANNEL_ID')
+        if not channel_id:
+            print(f"❌ YOUTUBE_CHANNEL_ID missing from .env file")
+            return False
         
-        # Scheduled publish time: 2025-09-20 9pm PST
-        scheduled_time = "2025-09-20T21:00:00-08:00"
+        # Auto-managed YouTube API credentials
+        def get_youtube_credentials():
+            """Get YouTube credentials with automatic OAuth flow and credential management."""
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            from google.auth.transport.requests import Request
+            
+            credentials_file = "youtube_credentials.json"
+            scopes = ['https://www.googleapis.com/auth/youtube.upload']
+            
+            credentials = None
+            
+            # Load existing credentials if they exist
+            if os.path.exists(credentials_file):
+                try:
+                    credentials = Credentials.from_authorized_user_file(credentials_file, scopes)
+                    print(f"📄 Loaded existing YouTube credentials")
+                except Exception as e:
+                    print(f"⚠️ Error loading existing credentials: {e}")
+            
+            # If credentials are invalid or don't exist, run OAuth flow
+            if not credentials or not credentials.valid:
+                if credentials and credentials.expired and credentials.refresh_token:
+                    try:
+                        print(f"🔄 Refreshing expired YouTube credentials...")
+                        credentials.refresh(Request())
+                        print(f"✅ Credentials refreshed successfully")
+                    except Exception as e:
+                        print(f"❌ Failed to refresh credentials: {e}")
+                        credentials = None
+                
+                if not credentials:
+                    # Load client config from environment
+                    client_id = os.getenv('YOUTUBE_CLIENT_ID')
+                    client_secret = os.getenv('YOUTUBE_CLIENT_SECRET')
+                    
+                    if not client_id or not client_secret:
+                        print(f"❌ YouTube OAuth credentials missing. Required: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET")
+                        print(f"📋 Get these from: https://console.cloud.google.com/apis/credentials")
+                        return None
+                    
+                    client_config = {
+                        "installed": {
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                            "token_uri": "https://oauth2.googleapis.com/token",
+                            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                            "redirect_uris": ["http://localhost"]
+                        }
+                    }
+                    
+                    print(f"🔐 Starting YouTube OAuth flow...")
+                    print(f"📱 This will open a browser window for authentication")
+                    print(f"🎯 Please log in with the account that owns channel: UCyjo8L-DEJaeGuufUqMpigw")
+                    
+                    try:
+                        flow = InstalledAppFlow.from_client_config(client_config, scopes)
+                        credentials = flow.run_local_server(port=0)
+                        print(f"✅ YouTube OAuth authentication successful!")
+                        
+                    except Exception as e:
+                        print(f"❌ OAuth authentication failed: {e}")
+                        return None
+                
+                # Save credentials for future use
+                try:
+                    with open(credentials_file, 'w') as f:
+                        f.write(credentials.to_json())
+                    print(f"💾 Credentials saved to {credentials_file}")
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not save credentials: {e}")
+            
+            return credentials
+        
+        # Get YouTube credentials (auto-managed)
+        try:
+            credentials = get_youtube_credentials()
+            if not credentials:
+                print(f"❌ Could not obtain YouTube credentials")
+                return False
+            
+            # Build YouTube service
+            youtube = build('youtube', 'v3', credentials=credentials)
+            print(f"✅ YouTube API service ready for uploads")
+            
+        except Exception as e:
+            print(f"❌ YouTube API setup failed: {e}")
+            return False
         
         uploads_successful = 0
         
@@ -1525,40 +1615,218 @@ def upload_videos_to_youtube(book_id: str, language: str, audiobook_dict: Dict) 
                 print(f"❌ Video file not found for Part {part_num}: {video_path}")
                 continue
             
+            # Check if video already uploaded (prevent duplicates)
+            existing_video_id = combo.get('youtube_video_id')
+            if existing_video_id and existing_video_id != f"placeholder_{book_id}_part{part_num}":
+                existing_url = combo.get('youtube_url', f"https://www.youtube.com/watch?v={existing_video_id}")
+                print(f"   ✅ Video already uploaded for Part {part_num}: {existing_url}")
+                uploads_successful += 1  # Count as successful
+                continue
+            
             # Generate title and description
             book_name = audiobook_dict.get('book_name', book_id)
             author = audiobook_dict.get('author', 'Unknown')
             narrator = audiobook_dict.get('narrator_name', 'Unknown')
             
+            # Generate enhanced title and description
             if len(combinations) > 1:
                 title = f"{book_name} by {author} - Part {part_num}"
-                description = f"Audiobook: {book_name} by {author} - Part {part_num}\nNarrated by {narrator}\n\nThis is part {part_num} of {len(combinations)} in this audiobook series.\n\nChapters: {combo.get('chapter_range', 'Unknown')}\nDuration: {combo.get('duration_hours', 0):.1f} hours"
+                description = f"""📚 {book_name} by {author} - Part {part_num}
+🎙️ Narrated by {narrator}
+
+📖 Classic Literature Audiobook - Part {part_num} of {len(combinations)}
+⏰ Duration: {combo.get('duration_hours', 0):.1f} hours
+📑 Chapters: {combo.get('chapter_range', 'Unknown')}
+
+🎧 This is a professionally generated audiobook using advanced AI narration technology.
+
+🔗 Other parts in this series:"""
+                
+                # Add links to other parts (will be filled after all upload)
+                for i, other_combo in enumerate(combinations, 1):
+                    if i != part_num:
+                        description += f"\n- Part {i}: [Will be available after upload]"
+                
+                description += f"""
+
+📝 About this audiobook:
+This classic work of literature has been carefully converted into audiobook format with high-quality AI narration. Perfect for commuting, exercising, or relaxing.
+
+#audiobook #{book_name.replace(' ', '').lower()} #{author.replace(' ', '').lower()} #literature #classicbooks #ai_narration"""
+            
             else:
                 title = f"{book_name} by {author}"
-                description = f"Complete Audiobook: {book_name} by {author}\nNarrated by {narrator}\n\nDuration: {combo.get('duration_hours', 0):.1f} hours\nChapters: {combo.get('chapter_range', 'All')}"
+                description = f"""📚 Complete Audiobook: {book_name} by {author}
+🎙️ Narrated by {narrator}
+
+📖 Classic Literature - Full Audiobook
+⏰ Total Duration: {combo.get('duration_hours', 0):.1f} hours
+📑 All Chapters Included
+
+🎧 This is a professionally generated audiobook using advanced AI narration technology.
+
+📝 About this audiobook:
+Experience this timeless classic in audiobook format with high-quality AI narration. Perfect for literature lovers, students, or anyone who enjoys great storytelling.
+
+Whether you're commuting, exercising, or simply relaxing, immerse yourself in this masterpiece of literature.
+
+🔖 Features:
+- Complete unabridged text
+- Professional AI narration
+- High-quality audio production
+- Chapter organization
+
+#audiobook #{book_name.replace(' ', '').lower()} #{author.replace(' ', '').lower()} #literature #classicbooks #ai_narration #unabridged"""
             
             print(f"📺 Uploading Part {part_num}: {title}")
             print(f"   Video: {video_path}")
             print(f"   Subtitle: {subtitle_path}")
-            print(f"   Scheduled: {scheduled_time}")
+            print(f"   Channel: {channel_id}")
             
-            # TODO: Implement actual YouTube API upload
-            # For now, simulate successful upload
-            print(f"   🔄 [PLACEHOLDER] YouTube API upload would happen here...")
-            print(f"   📱 Channel: {channel_id}")
-            print(f"   🕐 Schedule: {scheduled_time}")
+            # Convert publish date from audiobook format to YouTube format
+            publish_date = audiobook_dict.get('publish_date')
+            youtube_publish_time = None
             
-            # Simulate success and add YouTube data to combination plan
-            video_id = f"placeholder_{book_id}_part{part_num}"  # Would be real YouTube video ID
-            youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+            if publish_date:
+                try:
+                    # Convert from YYYYMMDDHHMMSS to YouTube ISO format
+                    from datetime import datetime
+                    dt = datetime.strptime(publish_date, '%Y%m%d%H%M%S')
+                    # Assume Seattle time (PDT/PST) - add timezone
+                    youtube_publish_time = dt.strftime('%Y-%m-%dT%H:%M:%S-07:00')  # PDT offset
+                    print(f"   📅 Scheduled publish: {youtube_publish_time}")
+                except Exception as e:
+                    print(f"   ⚠️ Invalid publish date format: {publish_date}, uploading as public immediately")
             
-            combo['youtube_video_id'] = video_id
-            combo['youtube_url'] = youtube_url
-            combo['youtube_channel_id'] = channel_id
-            combo['scheduled_publish'] = scheduled_time
-            
-            uploads_successful += 1
-            print(f"   ✅ [PLACEHOLDER] Video uploaded successfully")
+            # Real YouTube API upload
+            try:
+                # Generate enhanced tags
+                tags = [
+                    "audiobook",
+                    "literature", 
+                    "classic literature",
+                    "ai narration",
+                    book_name.replace(" ", "").lower(),
+                    author.replace(" ", "").lower(),
+                    "unabridged",
+                    "full audiobook"
+                ]
+                
+                # Add genre-specific tags
+                if "crime" in book_name.lower() or "punishment" in book_name.lower():
+                    tags.extend(["crime fiction", "psychological fiction", "russian literature"])
+                elif "martian" in book_name.lower() or "odyssey" in book_name.lower():
+                    tags.extend(["science fiction", "sci-fi", "classic sci-fi"])
+                
+                # Add duration-based tags
+                duration_hours = combo.get('duration_hours', 0)
+                if duration_hours > 10:
+                    tags.append("long audiobook")
+                elif duration_hours > 5:
+                    tags.append("medium audiobook")
+                else:
+                    tags.append("short audiobook")
+                
+                # Add part-specific tags for multi-part
+                if len(combinations) > 1:
+                    tags.extend([f"part {part_num}", "audiobook series"])
+                
+                # Prepare video metadata
+                if youtube_publish_time:
+                    # For scheduled publishing, upload as private
+                    video_status = {
+                        "privacyStatus": "private",  # Will auto-publish at scheduled time
+                        "publishAt": youtube_publish_time,
+                        "selfDeclaredMadeForKids": False
+                    }
+                    print(f"   📅 Scheduled for: {youtube_publish_time}")
+                else:
+                    # For immediate publishing, upload as public
+                    video_status = {
+                        "privacyStatus": "public",
+                        "selfDeclaredMadeForKids": False
+                    }
+                    print(f"   🔴 Publishing immediately")
+                
+                video_metadata = {
+                    "snippet": {
+                        "title": title,
+                        "description": description,
+                        "tags": tags[:20],  # YouTube limit is 500 chars total, ~20 tags
+                        "categoryId": "27",  # Education category
+                        "defaultLanguage": "en",
+                        "defaultAudioLanguage": "en"
+                    },
+                    "status": video_status
+                }
+                
+                # Upload video
+                print(f"   🔄 Starting video upload to YouTube...")
+                media_body = MediaFileUpload(video_path, resumable=True)
+                
+                insert_request = youtube.videos().insert(
+                    part="snippet,status",
+                    body=video_metadata,
+                    media_body=media_body
+                )
+                
+                response = insert_request.execute()
+                video_id = response['id']
+                youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+                
+                print(f"   ✅ Video uploaded successfully: {youtube_url}")
+                
+                # Upload custom thumbnail if available
+                selected_image_path = combo.get('selected_image_path')
+                if selected_image_path and os.path.exists(selected_image_path):
+                    try:
+                        print(f"   🖼️ Uploading custom thumbnail...")
+                        thumbnail_request = youtube.thumbnails().set(
+                            videoId=video_id,
+                            media_body=MediaFileUpload(selected_image_path)
+                        )
+                        thumbnail_response = thumbnail_request.execute()
+                        print(f"   ✅ Custom thumbnail uploaded successfully")
+                        
+                    except Exception as thumbnail_error:
+                        print(f"   ⚠️ Thumbnail upload failed: {thumbnail_error}")
+                        # Don't fail the whole upload for thumbnail issues
+                
+                # Upload subtitles if available
+                if subtitle_path and os.path.exists(subtitle_path):
+                    try:
+                        subtitle_media = MediaFileUpload(subtitle_path)
+                        captions_request = youtube.captions().insert(
+                            part="snippet",
+                            body={
+                                "snippet": {
+                                    "videoId": video_id,
+                                    "language": "en",
+                                    "name": "English"
+                                }
+                            },
+                            media_body=subtitle_media
+                        )
+                        
+                        captions_response = captions_request.execute()
+                        print(f"   ✅ Subtitles uploaded successfully")
+                        
+                    except Exception as subtitle_error:
+                        print(f"   ⚠️ Subtitle upload failed: {subtitle_error}")
+                        # Don't fail the whole upload for subtitle issues
+                
+                # Add real YouTube data to combination plan
+                combo['youtube_video_id'] = video_id
+                combo['youtube_url'] = youtube_url
+                combo['youtube_channel_id'] = channel_id
+                # No scheduled publish for now - will be configured later
+                
+                uploads_successful += 1
+                print(f"   🎯 Part {part_num} upload completed")
+                
+            except Exception as upload_error:
+                print(f"   ❌ Video upload failed for Part {part_num}: {upload_error}")
+                return False
         
         if uploads_successful == 0:
             print(f"❌ No videos could be uploaded")
