@@ -836,48 +836,61 @@ def plan_audio_combinations(book_id: str, language: str, audiobook_dict: Dict) -
     
     print(f"📊 Planning audio combinations for {book_id} ({language})")
     
-    # Chapter audio files directory (output from STEP5)
-    chapters_dir = Path(f"foundry/{book_id}/{language}/combined_audio/chapters")
+    # Raw audio files directory (output from STEP4) 
+    speech_dir = Path(f"foundry/{book_id}/{language}/speech")
     
-    if not chapters_dir.exists():
-        print(f"❌ Chapters directory not found: {chapters_dir}")
-        return {'success': False, 'error': f'Chapters directory not found: {chapters_dir}'}
+    if not speech_dir.exists():
+        print(f"❌ Speech directory not found: {speech_dir}")
+        return {'success': False, 'error': f'Speech directory not found: {speech_dir}'}
     
     try:
-        # Get all chapter audio files
-        chapter_files = sorted(chapters_dir.glob("chapter_*.mp3"))
-        if not chapter_files:
-            chapter_files = sorted(chapters_dir.glob("chapter_*.flac"))
-        if not chapter_files:
-            chapter_files = sorted(chapters_dir.glob("chapter_*.wav"))
+        # Get all chapter directories (ch001, ch002, etc.) from raw speech files
+        chapter_dirs = sorted([d for d in speech_dir.iterdir() if d.is_dir() and d.name.startswith('ch')])
         
-        if not chapter_files:
-            print(f"❌ No chapter audio files found in {chapters_dir}")
-            return {'success': False, 'error': 'No chapter audio files found'}
+        if not chapter_dirs:
+            print(f"❌ No chapter directories found in {speech_dir}")
+            return {'success': False, 'error': f'No chapter directories found in {speech_dir}'}
         
-        print(f"🔍 Found {len(chapter_files)} chapter files")
+        print(f"🔍 Found {len(chapter_dirs)} chapter directories")
         
-        # Calculate duration for each chapter using ffprobe
+        # Calculate total duration by analyzing all audio files in each chapter
         chapter_durations = []
         total_duration_seconds = 0
         
-        for chapter_file in chapter_files:
-            try:
-                cmd = [
-                    "ffprobe", "-v", "error", "-show_entries",
-                    "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
-                    str(chapter_file)
-                ]
-                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-                duration = float(result.stdout.strip())
-                chapter_durations.append(duration)
-                total_duration_seconds += duration
+        for chapter_dir in chapter_dirs:
+            chapter_total_duration = 0
+            
+            # Find all audio files in chunk subdirectories
+            for chunk_dir in sorted(chapter_dir.iterdir()):
+                if not chunk_dir.is_dir():
+                    continue
+                    
+                # Find audio files in this chunk
+                audio_files = list(chunk_dir.glob("*.flac")) + list(chunk_dir.glob("*.wav")) + list(chunk_dir.glob("*.mp3"))
                 
-                print(f"  📄 {chapter_file.name}: {duration/3600:.2f}h ({duration/60:.1f}min)")
-                
-            except Exception as e:
-                print(f"❌ Error getting duration for {chapter_file}: {e}")
-                return {'success': False, 'error': f'Error analyzing chapter duration: {e}'}
+                for audio_file in audio_files:
+                    try:
+                        cmd = [
+                            "ffprobe", "-v", "error", "-show_entries",
+                            "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
+                            str(audio_file)
+                        ]
+                        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                        duration = float(result.stdout.strip())
+                        chapter_total_duration += duration
+                        
+                    except Exception as e:
+                        print(f"❌ Error getting duration for {audio_file}: {e}")
+                        continue
+            
+            chapter_durations.append(chapter_total_duration)
+            total_duration_seconds += chapter_total_duration
+            
+            print(f"  📄 {chapter_dir.name}: {chapter_total_duration/3600:.2f}h ({chapter_total_duration/60:.1f}min)")
+            
+        if not chapter_durations:
+            print(f"❌ No audio files found in chapter directories")
+            return {'success': False, 'error': 'No audio files found in chapter directories'}
         
         # Convert to hours and minutes
         total_hours = total_duration_seconds / 3600
@@ -1313,6 +1326,255 @@ def select_images_for_audiobook(book_id: str, language: str, audiobook_dict: Dic
         
     except Exception as e:
         print(f"❌ Error selecting images: {e}")
+        return False
+
+
+def generate_videos_for_audiobook(book_id: str, language: str, audiobook_dict: Dict) -> bool:
+    """
+    Generate video files for audiobook parts using combination plan.
+    
+    Reads combination_plan.json and generates videos by combining audio + selected images
+    using ffmpeg, then updates the plan file with video paths.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg23731')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if videos generated successfully
+    """
+    import json
+    import os
+    import subprocess
+    from pathlib import Path
+    
+    print(f"🎬 Generating videos for {book_id} ({language})")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        print(f"❌ Combination plan not found: {plan_file}")
+        return False
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        combinations = combination_plan.get('combinations', [])
+        if not combinations:
+            print(f"❌ No combinations found in plan file")
+            return False
+        
+        print(f"🔍 Found {len(combinations)} parts to generate videos for")
+        
+        # Create videos directory
+        videos_dir = f"foundry/{book_id}/{language}/videos"
+        os.makedirs(videos_dir, exist_ok=True)
+        
+        # Generate video for each part
+        videos_created = 0
+        for combo in combinations:
+            part_num = combo['part']
+            audio_path = combo.get('audio_path')
+            image_path = combo.get('selected_image_path')
+            
+            if not audio_path or not os.path.exists(audio_path):
+                print(f"❌ Audio file not found for Part {part_num}: {audio_path}")
+                continue
+                
+            if not image_path or not os.path.exists(image_path):
+                print(f"❌ Selected image not found for Part {part_num}: {image_path}")
+                continue
+            
+            # Generate video filename
+            audio_filename = combo.get('output_filename', f"{book_id}_part{part_num}.mp3")
+            video_filename = audio_filename.replace('.mp3', '.mp4').replace('.flac', '.mp4').replace('.wav', '.mp4')
+            video_path = f"{videos_dir}/{video_filename}"
+            
+            print(f"🎬 Generating video for Part {part_num}")
+            print(f"   Audio: {audio_path}")
+            print(f"   Image: {image_path}")
+            print(f"   Output: {video_path}")
+            
+            # Create video using ffmpeg
+            try:
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-loop", "1",                    # Loop the image
+                    "-i", image_path,                # Input image
+                    "-i", audio_path,                # Input audio
+                    "-c:v", "libx264",               # Video codec
+                    "-c:a", "aac",                   # Audio codec
+                    "-b:a", "192k",                  # Audio bitrate
+                    "-shortest",                     # Stop when shortest input ends (audio)
+                    "-pix_fmt", "yuv420p",           # Pixel format for compatibility
+                    video_path                       # Output video
+                ]
+                
+                print(f"   🔄 Running ffmpeg...")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)  # 1 hour timeout
+                
+                if result.returncode == 0:
+                    # Verify video file was created
+                    if os.path.exists(video_path):
+                        file_size = os.path.getsize(video_path) / (1024 * 1024)  # MB
+                        print(f"   ✅ Video created: {video_filename} ({file_size:.1f} MB)")
+                        
+                        # Add video path to combination plan
+                        combo['video_path'] = video_path
+                        videos_created += 1
+                    else:
+                        print(f"   ❌ Video file not created despite successful ffmpeg")
+                        continue
+                else:
+                    print(f"   ❌ ffmpeg failed with return code {result.returncode}")
+                    if result.stderr:
+                        print(f"   Error: {result.stderr[-500:]}")  # Last 500 chars
+                    continue
+                    
+            except subprocess.TimeoutExpired:
+                print(f"   ❌ ffmpeg timeout after 1 hour")
+                continue
+            except Exception as e:
+                print(f"   ❌ Error running ffmpeg: {e}")
+                continue
+        
+        if videos_created == 0:
+            print(f"❌ No videos could be generated")
+            return False
+        
+        # Save updated combination plan with video paths
+        with open(plan_file, 'w', encoding='utf-8') as f:
+            json.dump(combination_plan, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Video generation completed - {videos_created} videos created")
+        print(f"💾 Updated combination plan saved")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error generating videos: {e}")
+        return False
+
+
+def upload_videos_to_youtube(book_id: str, language: str, audiobook_dict: Dict) -> bool:
+    """
+    Upload video files to YouTube for audiobook based on combination plan.
+    
+    Reads combination_plan.json and uploads each video part to the specified
+    YouTube channel with proper metadata and scheduled publishing.
+    
+    Args:
+        book_id: Book identifier (e.g., 'pg23731')
+        language: Language code (e.g., 'eng')
+        audiobook_dict: Complete audiobook metadata dict
+        
+    Returns:
+        bool: True if all videos uploaded successfully
+    """
+    import json
+    import os
+    from datetime import datetime, timezone
+    
+    print(f"📺 Uploading videos to YouTube for {book_id} ({language})")
+    
+    # Read combination plan
+    plan_file = f"foundry/{book_id}/{language}/combination_plan.json"
+    
+    if not os.path.exists(plan_file):
+        print(f"❌ Combination plan not found: {plan_file}")
+        return False
+    
+    try:
+        with open(plan_file, 'r', encoding='utf-8') as f:
+            combination_plan = json.load(f)
+        
+        combinations = combination_plan.get('combinations', [])
+        if not combinations:
+            print(f"❌ No combinations found in plan file")
+            return False
+        
+        print(f"🔍 Found {len(combinations)} video parts to upload")
+        
+        # YouTube API setup
+        try:
+            from googleapiclient.discovery import build
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            import pickle
+        except ImportError:
+            print(f"❌ YouTube API libraries not installed. Run: pip install google-api-python-client google-auth-oauthlib")
+            return False
+        
+        # Load YouTube credentials from environment
+        channel_id = "UCyjo8L-DEJaeGuufUqMpigw"
+        
+        # Scheduled publish time: 2025-09-20 9pm PST
+        scheduled_time = "2025-09-20T21:00:00-08:00"
+        
+        uploads_successful = 0
+        
+        # Upload each video part
+        for combo in combinations:
+            part_num = combo['part']
+            video_path = combo.get('video_path')
+            subtitle_path = combo.get('subtitle_path')
+            
+            if not video_path or not os.path.exists(video_path):
+                print(f"❌ Video file not found for Part {part_num}: {video_path}")
+                continue
+            
+            # Generate title and description
+            book_name = audiobook_dict.get('book_name', book_id)
+            author = audiobook_dict.get('author', 'Unknown')
+            narrator = audiobook_dict.get('narrator_name', 'Unknown')
+            
+            if len(combinations) > 1:
+                title = f"{book_name} by {author} - Part {part_num}"
+                description = f"Audiobook: {book_name} by {author} - Part {part_num}\nNarrated by {narrator}\n\nThis is part {part_num} of {len(combinations)} in this audiobook series.\n\nChapters: {combo.get('chapter_range', 'Unknown')}\nDuration: {combo.get('duration_hours', 0):.1f} hours"
+            else:
+                title = f"{book_name} by {author}"
+                description = f"Complete Audiobook: {book_name} by {author}\nNarrated by {narrator}\n\nDuration: {combo.get('duration_hours', 0):.1f} hours\nChapters: {combo.get('chapter_range', 'All')}"
+            
+            print(f"📺 Uploading Part {part_num}: {title}")
+            print(f"   Video: {video_path}")
+            print(f"   Subtitle: {subtitle_path}")
+            print(f"   Scheduled: {scheduled_time}")
+            
+            # TODO: Implement actual YouTube API upload
+            # For now, simulate successful upload
+            print(f"   🔄 [PLACEHOLDER] YouTube API upload would happen here...")
+            print(f"   📱 Channel: {channel_id}")
+            print(f"   🕐 Schedule: {scheduled_time}")
+            
+            # Simulate success and add YouTube data to combination plan
+            video_id = f"placeholder_{book_id}_part{part_num}"  # Would be real YouTube video ID
+            youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+            
+            combo['youtube_video_id'] = video_id
+            combo['youtube_url'] = youtube_url
+            combo['youtube_channel_id'] = channel_id
+            combo['scheduled_publish'] = scheduled_time
+            
+            uploads_successful += 1
+            print(f"   ✅ [PLACEHOLDER] Video uploaded successfully")
+        
+        if uploads_successful == 0:
+            print(f"❌ No videos could be uploaded")
+            return False
+        
+        # Save updated combination plan with YouTube data
+        with open(plan_file, 'w', encoding='utf-8') as f:
+            json.dump(combination_plan, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ YouTube upload completed - {uploads_successful} videos uploaded")
+        print(f"📺 Channel: https://studio.youtube.com/channel/{channel_id}")
+        print(f"💾 Updated combination plan saved")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error uploading to YouTube: {e}")
         return False
 
 

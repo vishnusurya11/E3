@@ -5,10 +5,15 @@ Clean implementation using normalized database schema.
 
 import logging
 import os
+import time
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime
 
-from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, get_comfyui_audio_job_status, get_comfyui_image_job_status, move_comfyui_audio_files, move_comfyui_image_files, combine_audiobook_files, plan_audio_combinations, generate_subtitles_for_audiobook, generate_image_prompts_for_audiobook, create_image_jobs_for_audiobook, select_images_for_audiobook
+from audiobook_helper import get_processing_queue, get_audiobook_events, add_audiobook_event, add_book_metadata_to_first_chunk, get_comfyui_job_status_by_book_id, get_comfyui_audio_job_status, get_comfyui_image_job_status, move_comfyui_audio_files, move_comfyui_image_files, combine_audiobook_files, plan_audio_combinations, generate_subtitles_for_audiobook, generate_image_prompts_for_audiobook, create_image_jobs_for_audiobook, select_images_for_audiobook, generate_videos_for_audiobook, upload_videos_to_youtube
+
+# Configuration
+CONTINUOUS_MODE = True  # Set to False for single run
+LOOP_INTERVAL_MINUTES = 5  # Configurable interval
 
 
 def setup_logging():
@@ -49,7 +54,7 @@ def log_and_print(audiobook_id, book_id, step, status, message):
 logger = setup_logging()
 
 
-def main():
+def main_single_run():
     """
     ################################################################################
     # STEP 0: GET RECORDS THAT NEED PROCESSING
@@ -60,6 +65,7 @@ def main():
     """
     # Step 0 setup - no specific book yet
     timestamp = datetime.now().isoformat()
+    print(f"DEBUG: Python working directory: {os.getcwd()}")
     print(f"{timestamp}|SYSTEM|STEP0_queue|STARTING|Getting processing queue")
     logger.info("SYSTEM|STEP0_queue|STARTING|Getting processing queue")
     
@@ -120,47 +126,53 @@ def main():
             if current_step == 'STEP1_parsing' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP1_parsing", "STARTING", "Novel parsing execution initiated")
                 
-                success = execute_step1_parsing(audiobook)  # Pass entire dict
+                result = execute_step1_parsing(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP1_parsing', 'success')
                     add_audiobook_event(audiobook_id, 'STEP2_metadata', 'pending')  
                     
-                    log_and_print(audiobook_id, book_id, "STEP1_parsing", "SUCCESS", "Novel parsing completed - STEP3_create_audio_jobs queued")
-                else:
+                    log_and_print(audiobook_id, book_id, "STEP1_parsing", "SUCCESS", "Novel parsing completed - STEP2_metadata queued")
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP1_parsing', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP1_parsing", "FAILED", "Novel parsing execution failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP2_metadata' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP2_metadata", "STARTING", "Metadata addition execution initiated")
                 
-                success = execute_step2_metadata(audiobook)  # Pass entire dict
+                result = execute_step2_metadata(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP2_metadata', 'success')
                     add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'pending')  
                     
                     log_and_print(audiobook_id, book_id, "STEP2_metadata", "SUCCESS", "Metadata addition completed - STEP3_create_audio_jobs queued")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP2_metadata', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP2_metadata", "FAILED", "Metadata addition execution failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP3_create_audio_jobs' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "STARTING", "TTS job creation execution initiated")
                 
-                success = execute_step3_create_audio_jobs(audiobook)  # Pass entire dict
+                result = execute_step3_create_audio_jobs(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'success')
                     add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'pending')  
                     
                     log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "SUCCESS", "TTS jobs created - STEP4_monitor_and_move_audio queued")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "FAILED", "TTS job creation failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP4_monitor_and_move_audio' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "STARTING", "Audio monitoring and moving execution initiated")
@@ -168,76 +180,86 @@ def main():
                 result = execute_step4_monitor_and_move_audio(audiobook, current_status)  # Pass current status instead of step
                 
                 # Update event status based on result
-                if result == True:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'success')
                     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "SUCCESS", "Audio monitoring and moving completed - STEP5_combine_audio queued")
-                elif result == "processing":
+                elif result == "P":
                     log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "WAITING", "ComfyUI jobs still processing - will check again next cycle")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "FAILED", "Audio monitoring and moving failed")
 
             elif current_step == 'STEP5_combine_audio' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "STARTING", "Audio combination execution initiated")
                 
-                success = execute_step5_combine_audio(audiobook)  # Pass entire dict
+                result = execute_step5_combine_audio(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'success')
                     add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", "Audio planning and combination completed")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "FAILED", "Audio combination failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP6_generate_subtitles' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "STARTING", "Subtitle generation execution initiated")
                 
-                success = execute_step6_generate_subtitles(audiobook)  # Pass entire dict
+                result = execute_step6_generate_subtitles(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'success')
                     add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "SUCCESS", "Subtitle generation completed")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "FAILED", "Subtitle generation failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP7_generate_image_prompts' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "STARTING", "Image prompt generation execution initiated")
                 
-                success = execute_step7_generate_image_prompts(audiobook)  # Pass entire dict
+                result = execute_step7_generate_image_prompts(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'success')
                     add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "SUCCESS", "Image prompt generation completed")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "FAILED", "Image prompt generation failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP8_create_image_jobs' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "STARTING", "Image job creation execution initiated")
                 
-                success = execute_step8_create_image_jobs(audiobook)  # Pass entire dict
+                result = execute_step8_create_image_jobs(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'success')
                     add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "SUCCESS", "Image job creation completed")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "FAILED", "Image job creation failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
 
             elif current_step == 'STEP9_monitor_and_move_images' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "STARTING", "Image monitoring and moving execution initiated")
@@ -245,40 +267,59 @@ def main():
                 result = execute_step9_monitor_and_move_images(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if result == True:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'success')
                     add_audiobook_event(audiobook_id, 'STEP10_select_image', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "SUCCESS", "Image monitoring and moving completed")
-                elif result == "processing":
+                elif result == "P":
                     log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "WAITING", "ComfyUI image jobs still processing - will check again next cycle")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP9_monitor_and_move_images', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "FAILED", "Image monitoring and moving failed")
 
             elif current_step == 'STEP10_select_image' and current_status not in ['success']:
                 log_and_print(audiobook_id, book_id, "STEP10_select_image", "STARTING", "Image selection execution initiated")
                 
-                success = execute_step10_select_images(audiobook)  # Pass entire dict
+                result = execute_step10_select_images(audiobook, current_status)  # Pass current status
                 
                 # Update event status based on result
-                if success:
+                if result == "S":
                     add_audiobook_event(audiobook_id, 'STEP10_select_image', 'success')
                     add_audiobook_event(audiobook_id, 'STEP11_generate_video', 'pending')
                     
                     log_and_print(audiobook_id, book_id, "STEP10_select_image", "SUCCESS", "Image selection completed")
-                else:
+                elif result == "F":
                     add_audiobook_event(audiobook_id, 'STEP10_select_image', 'failed')
                     log_and_print(audiobook_id, book_id, "STEP10_select_image", "FAILED", "Image selection failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
+
+            elif current_step == 'STEP11_generate_video' and current_status not in ['success']:
+                log_and_print(audiobook_id, book_id, "STEP11_generate_video", "STARTING", "Video generation execution initiated")
+                
+                result = execute_step11_generate_videos(audiobook, current_status)  # Pass current status
+                
+                # Update event status based on result
+                if result == "S":
+                    add_audiobook_event(audiobook_id, 'STEP11_generate_video', 'success')
+                    add_audiobook_event(audiobook_id, 'STEP12_upload_video_to_youtube', 'pending')
+                    
+                    log_and_print(audiobook_id, book_id, "STEP11_generate_video", "SUCCESS", "Video generation completed")
+                elif result == "F":
+                    add_audiobook_event(audiobook_id, 'STEP11_generate_video', 'failed')
+                    log_and_print(audiobook_id, book_id, "STEP11_generate_video", "FAILED", "Video generation failed")
+                elif result == "P":
+                    pass  # Skip - no events, just continue to next book
             
-            # TODO: Add other steps (STEP11, STEP12, etc.)
+            # TODO: Add other steps (STEP12, STEP13, etc.)
     
     timestamp = datetime.now().isoformat()
     print(f"{timestamp}|SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished")
     logger.info("SYSTEM|PROCESSING|COMPLETED|Event processing cycle finished")
 
 
-def execute_step1_parsing(audiobook_dict: dict) -> bool:
+def execute_step1_parsing(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP1_parsing: Parse novel from HTML source
@@ -291,6 +332,11 @@ def execute_step1_parsing(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP1_parsing", "STILL_PROCESSING", "Step still processing from previous run")
+        return "P"  # Don't change database status
+    
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP1_parsing', 'processing')
     log_and_print(audiobook_id, book_id, "STEP1_parsing", "PROCESSING", "Novel parsing execution started")
@@ -302,10 +348,10 @@ def execute_step1_parsing(audiobook_dict: dict) -> bool:
         import glob, os
         input_pattern = f"foundry/{book_id}/*{book_id}*.html"
         html_files = glob.glob(input_pattern)
-        
+        print(f" html_files - > {html_files}")
         if not html_files:
             log_and_print(audiobook_id, book_id, "STEP1_parsing", "ERROR", f"No HTML file found in foundry/{book_id}/")
-            return False
+            return "F"
             
         input_file = html_files[0]
         output_dir = f"foundry/{book_id}/{language}/chapters"
@@ -319,17 +365,19 @@ def execute_step1_parsing(audiobook_dict: dict) -> bool:
         
         if result.get('success', False):
             log_and_print(audiobook_id, book_id, "STEP1_parsing", "SUCCESS", f"Parsed {result.get('total_chapters', 0)} chapters, {result.get('total_chunks', 0)} chunks, {result.get('total_words', 0)} words")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP1_parsing", "ERROR", f"Parse failed: {result.get('error', 'Unknown')}")
-            return False
+            return "F"
         
     except Exception as e:
+        print("###############")
+        print(e)
         log_and_print(audiobook_id, book_id, "STEP1_parsing", "ERROR", f"Exception: {str(e)}")
-        return False
+        return "F"
 
 
-def execute_step2_metadata(audiobook_dict: dict) -> bool:
+def execute_step2_metadata(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP2_metadata: Add book metadata to first chunk
@@ -342,6 +390,11 @@ def execute_step2_metadata(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP2_metadata", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP2_metadata', 'processing')
@@ -359,17 +412,17 @@ def execute_step2_metadata(audiobook_dict: dict) -> bool:
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP2_metadata", "SUCCESS", "Book metadata added to first chunk")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP2_metadata", "ERROR", "Failed to add metadata to first chunk")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP2_metadata", "ERROR", f"Exception: {str(e)}")
-        return False
+        return "F"
 
 
-def execute_step3_create_audio_jobs(audiobook_dict: dict) -> bool:
+def execute_step3_create_audio_jobs(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP3_create_audio_jobs: Create TTS jobs for ComfyUI processing
@@ -382,6 +435,11 @@ def execute_step3_create_audio_jobs(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP3_create_audio_jobs', 'processing')
@@ -408,10 +466,10 @@ def execute_step3_create_audio_jobs(audiobook_dict: dict) -> bool:
         if result.get('success', False):
             jobs_created = result.get('total_jobs_created', 0)
             log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "SUCCESS", f"Created {jobs_created} TTS jobs for ComfyUI processing")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "ERROR", f"Job creation failed: {result.get('error', 'Unknown error')}")
-            return False
+            return "F"
             
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP3_create_audio_jobs", "ERROR", f"Exception: {str(e)}")
@@ -434,7 +492,7 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
     language = audiobook_dict.get('language', 'eng')
     
     # Update to processing when starting
-    if current_step == "pending":
+    if current_step == "pending" or current_step == "failed":
         add_audiobook_event(audiobook_id, 'STEP4_monitor_and_move_audio', 'processing')
         log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "PROCESSING", "Audio monitoring and moving started")
     
@@ -444,7 +502,7 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
         
         if not job_status:
             log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", "No ComfyUI jobs found for this book")
-            return False
+            return "F"
         
         # Check if all jobs are done
         pending_count = job_status.get('pending', 0)
@@ -463,7 +521,7 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
         # If there are failed jobs, report error
         if failed_count > 0 and done_count == 0:
             log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", f"{failed_count} jobs failed with no successful completions")
-            return False
+            return "F"
         
         # All jobs are done - proceed with moving files
         log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "PROGRESS", f"All {done_count} ComfyUI jobs completed - moving audio files")
@@ -473,17 +531,17 @@ def execute_step4_monitor_and_move_audio(audiobook_dict: dict, current_step):
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "SUCCESS", "Audio files moved successfully to foundry speech directory")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", "Failed to move audio files")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP4_monitor_and_move_audio", "ERROR", f"Exception: {str(e)}")
         return False
 
 
-def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
+def execute_step5_combine_audio(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP5_combine_audio: Plan and combine audio files into final audiobook
@@ -497,6 +555,11 @@ def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP5_combine_audio', 'processing')
@@ -515,7 +578,7 @@ def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
         if not combination_plan.get('success', False):
             error_msg = combination_plan.get('error', 'Planning failed')
             log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", f"Planning phase failed: {error_msg}")
-            return False
+            return "F"
         
         # Log planning results
         parts_needed = combination_plan.get('parts_needed', 1)
@@ -555,17 +618,17 @@ def execute_step5_combine_audio(audiobook_dict: dict) -> bool:
         if success:
             log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "SUCCESS", 
                          f"Audio planning and combination completed - {parts_needed} parts created")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", "Audio combination phase failed")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP5_combine_audio", "ERROR", f"Exception: {str(e)}")
         return False
 
 
-def execute_step6_generate_subtitles(audiobook_dict: dict) -> bool:
+def execute_step6_generate_subtitles(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP6_generate_subtitles: Generate subtitle files for audiobook parts
@@ -578,6 +641,11 @@ def execute_step6_generate_subtitles(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP6_generate_subtitles', 'processing')
@@ -593,10 +661,10 @@ def execute_step6_generate_subtitles(audiobook_dict: dict) -> bool:
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "SUCCESS", "Subtitle generation completed")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "ERROR", "Subtitle generation failed")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP6_generate_subtitles", "ERROR", f"Exception: {str(e)}")
@@ -605,7 +673,7 @@ def execute_step6_generate_subtitles(audiobook_dict: dict) -> bool:
 
 
 
-def execute_step7_generate_image_prompts(audiobook_dict: dict) -> bool:
+def execute_step7_generate_image_prompts(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP7_generate_image_prompts: Generate image prompts for audiobook thumbnails
@@ -618,6 +686,11 @@ def execute_step7_generate_image_prompts(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP7_generate_image_prompts', 'processing')
@@ -633,17 +706,17 @@ def execute_step7_generate_image_prompts(audiobook_dict: dict) -> bool:
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "SUCCESS", "Image prompt generation completed")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "ERROR", "Image prompt generation failed")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP7_generate_image_prompts", "ERROR", f"Exception: {str(e)}")
         return False
 
 
-def execute_step8_create_image_jobs(audiobook_dict: dict) -> bool:
+def execute_step8_create_image_jobs(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP8_create_image_jobs: Create ComfyUI image generation jobs
@@ -656,6 +729,11 @@ def execute_step8_create_image_jobs(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP8_create_image_jobs', 'processing')
@@ -671,10 +749,10 @@ def execute_step8_create_image_jobs(audiobook_dict: dict) -> bool:
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "SUCCESS", "Image job creation completed")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "ERROR", "Image job creation failed")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP8_create_image_jobs", "ERROR", f"Exception: {str(e)}")
@@ -708,7 +786,7 @@ def execute_step9_monitor_and_move_images(audiobook_dict: dict, current_step):
         
         if not job_status:
             log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", "No ComfyUI image jobs found for this book")
-            return False
+            return "F"
         
         # Check if all jobs are done
         pending_count = job_status.get('pending', 0)
@@ -727,7 +805,7 @@ def execute_step9_monitor_and_move_images(audiobook_dict: dict, current_step):
         # If there are failed jobs, report error
         if failed_count > 0 and done_count == 0:
             log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", f"{failed_count} image jobs failed with no successful completions")
-            return False
+            return "F"
         
         # All jobs are done - proceed with moving files
         log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "PROGRESS", f"All {done_count} ComfyUI image jobs completed - moving image files")
@@ -737,10 +815,10 @@ def execute_step9_monitor_and_move_images(audiobook_dict: dict, current_step):
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "SUCCESS", "Image files moved successfully to foundry images directory")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", "Failed to move image files")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP9_monitor_and_move_images", "ERROR", f"Exception: {str(e)}")
@@ -748,7 +826,7 @@ def execute_step9_monitor_and_move_images(audiobook_dict: dict, current_step):
 
 
 
-def execute_step10_select_images(audiobook_dict: dict) -> bool:
+def execute_step10_select_images(audiobook_dict: dict, current_status: str = "pending") -> str:
     """
     ################################################################################
     # STEP10_select_images: Select thumbnail images for audiobook parts
@@ -761,6 +839,11 @@ def execute_step10_select_images(audiobook_dict: dict) -> bool:
     book_id = audiobook_dict['book_id']
     audiobook_id = audiobook_dict['audiobook_id']
     language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP10_select_images", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
     
     # Update to processing when starting
     add_audiobook_event(audiobook_id, 'STEP10_select_images', 'processing')
@@ -776,14 +859,147 @@ def execute_step10_select_images(audiobook_dict: dict) -> bool:
         
         if success:
             log_and_print(audiobook_id, book_id, "STEP10_select_images", "SUCCESS", "Image selection completed")
-            return True
+            return "S"
         else:
             log_and_print(audiobook_id, book_id, "STEP10_select_images", "ERROR", "Image selection failed")
-            return False
+            return "F"
         
     except Exception as e:
         log_and_print(audiobook_id, book_id, "STEP10_select_images", "ERROR", f"Exception: {str(e)}")
         return False
+
+
+
+def execute_step12_upload_video_to_youtube(audiobook_dict: dict, current_status: str = "pending") -> str:
+    """
+    ################################################################################
+    # STEP12_upload_video_to_youtube: Upload video files to YouTube
+    #
+    # Purpose: Upload generated videos to YouTube with metadata and scheduling
+    # Input:   Video files and metadata from combination_plan.json
+    # Output:  YouTube video URLs and updated combination plan
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "STILL_PROCESSING", "Step still processing from previous run")
+        return "P"  # Don't change database status
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP12_upload_video_to_youtube', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "PROCESSING", "YouTube upload started")
+    
+    try:
+        # Call helper function to upload videos
+        success = upload_videos_to_youtube(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "SUCCESS", "YouTube upload completed")
+            return "S"
+        else:
+            log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "ERROR", "YouTube upload failed")
+            return "F"
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP12_upload_video_to_youtube", "ERROR", f"Exception: {str(e)}")
+        return "F"
+
+
+def execute_step11_generate_videos(audiobook_dict: dict, current_status: str = "pending") -> str:
+    """
+    ################################################################################
+    # STEP11_generate_videos: Generate video files from audio and selected images
+    #
+    # Purpose: Combine audio files with selected thumbnail images to create videos
+    # Input:   Audio and image paths from combination_plan.json
+    # Output:  Video files in foundry/{book_id}/{language}/videos/
+    ################################################################################
+    """
+    book_id = audiobook_dict['book_id']
+    audiobook_id = audiobook_dict['audiobook_id']
+    language = audiobook_dict.get('language', 'eng')
+    
+    # If already processing, just log and exit
+    if current_status == "processing":
+        log_and_print(audiobook_id, book_id, "STEP11_generate_videos", "STILL_PROCESSING", "Step still processing from previous run")
+        return True  # Don't change database status
+    
+    # Update to processing when starting
+    add_audiobook_event(audiobook_id, 'STEP11_generate_videos', 'processing')
+    log_and_print(audiobook_id, book_id, "STEP11_generate_videos", "PROCESSING", "Video generation started")
+    
+    try:
+        # Call helper function to generate videos
+        success = generate_videos_for_audiobook(
+            book_id=book_id,
+            language=language,
+            audiobook_dict=audiobook_dict
+        )
+        
+        if success:
+            log_and_print(audiobook_id, book_id, "STEP11_generate_videos", "SUCCESS", "Video generation completed")
+            return "S"
+        else:
+            log_and_print(audiobook_id, book_id, "STEP11_generate_videos", "ERROR", "Video generation failed")
+            return "F"
+        
+    except Exception as e:
+        log_and_print(audiobook_id, book_id, "STEP11_generate_videos", "ERROR", f"Exception: {str(e)}")
+        return False
+
+
+
+def main():
+    """
+    Main entry point - supports both single run and continuous mode.
+    """
+    if not CONTINUOUS_MODE:
+        return main_single_run()
+    
+    print(f"🤖 AUDIOBOOK CLI CONTINUOUS AUTOMATION")
+    print(f"Running every {LOOP_INTERVAL_MINUTES} minutes")
+    print(f"Working directory: {os.getcwd()}")
+    print("Press Ctrl+C to stop")
+    print("=" * 60)
+    
+    run_count = 0
+    try:
+        while True:
+            run_count += 1
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"\n🔄 [Run #{run_count}] {timestamp}")
+            print("#" * 60)
+            print("#" * 60)
+            
+            try:
+                main_single_run()
+                print(f"✅ Run #{run_count} completed successfully")
+                logger.info(f"AUTOMATION|RUN_{run_count}|SUCCESS|Automation cycle completed")
+            except KeyboardInterrupt:
+                raise  # Re-raise to break out of loop
+            except Exception as e:
+                print(f"❌ Run #{run_count} failed: {str(e)}")
+                logger.error(f"AUTOMATION|RUN_{run_count}|ERROR|Automation cycle failed: {str(e)}")
+            
+            print(f"⏰ Waiting {LOOP_INTERVAL_MINUTES} minutes until next run...")
+            logger.info(f"AUTOMATION|RUN_{run_count}|WAITING|Next run in {LOOP_INTERVAL_MINUTES} minutes")
+            print("#" * 60)
+            print("#" * 60)
+            # Sleep for specified interval
+            time.sleep(LOOP_INTERVAL_MINUTES * 60)
+            
+    except KeyboardInterrupt:
+        print(f"\n🛑 Continuous automation stopped by user after {run_count} runs")
+        logger.info(f"AUTOMATION|STOPPED|User stopped automation after {run_count} runs")
+        print("Goodbye! 👋")
 
 
 if __name__ == "__main__":

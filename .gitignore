@@ -30,3 +30,4 @@ database/*
 comfyui_jobs/*
 *.log
 *.db*
+logs/*
