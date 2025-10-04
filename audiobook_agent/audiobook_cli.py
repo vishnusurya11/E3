@@ -974,49 +974,68 @@ def execute_step11_generate_videos(audiobook_dict: dict, current_status: str = "
 
 
 
+def run_audiobook_automation():
+    """
+    Callable function to run audiobook automation logic (for master_cli.py).
+
+    Returns:
+        bool: True if completed successfully, False if failed
+    """
+    try:
+        main_single_run()
+        return True
+    except Exception as e:
+        print(f"Audiobook automation failed: {str(e)}")
+        logger.error(f"AUDIOBOOK|ERROR|Automation failed: {str(e)}")
+        return False
+
+
 def main():
     """
     Main entry point - supports both single run and continuous mode.
     """
     if not CONTINUOUS_MODE:
         return main_single_run()
-    
-    print(f"🤖 AUDIOBOOK CLI CONTINUOUS AUTOMATION")
+
+    print(f"AUDIOBOOK CLI CONTINUOUS AUTOMATION")
     print(f"Running every {LOOP_INTERVAL_MINUTES} minutes")
     print(f"Working directory: {os.getcwd()}")
     print("Press Ctrl+C to stop")
     print("=" * 60)
-    
+
     run_count = 0
     try:
         while True:
             run_count += 1
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print(f"\n🔄 [Run #{run_count}] {timestamp}")
+            print(f"\n[Audiobook Run #{run_count}] {timestamp}")
             print("#" * 60)
-            print("#" * 60)
-            
+
             try:
-                main_single_run()
-                print(f"✅ Run #{run_count} completed successfully")
-                logger.info(f"AUTOMATION|RUN_{run_count}|SUCCESS|Automation cycle completed")
+                success = run_audiobook_automation()
+                if success:
+                    print(f"SUCCESS: Audiobook Run #{run_count} completed successfully")
+                    logger.info(f"AUTOMATION|RUN_{run_count}|SUCCESS|Automation cycle completed")
+                else:
+                    print(f"ERROR: Audiobook Run #{run_count} failed")
+                    logger.error(f"AUTOMATION|RUN_{run_count}|ERROR|Automation cycle failed")
             except KeyboardInterrupt:
                 raise  # Re-raise to break out of loop
             except Exception as e:
-                print(f"❌ Run #{run_count} failed: {str(e)}")
+                print(f"ERROR: Audiobook Run #{run_count} failed: {str(e)}")
                 logger.error(f"AUTOMATION|RUN_{run_count}|ERROR|Automation cycle failed: {str(e)}")
-            
-            print(f"⏰ Waiting {LOOP_INTERVAL_MINUTES} minutes until next run...")
+
+            print(f"Waiting {LOOP_INTERVAL_MINUTES} minutes until next run...")
             logger.info(f"AUTOMATION|RUN_{run_count}|WAITING|Next run in {LOOP_INTERVAL_MINUTES} minutes")
             print("#" * 60)
-            print("#" * 60)
+
             # Sleep for specified interval
             time.sleep(LOOP_INTERVAL_MINUTES * 60)
-            
+
     except KeyboardInterrupt:
-        print(f"\n🛑 Continuous automation stopped by user after {run_count} runs")
+        print(f"\nAudiobook automation stopped by user after {run_count} runs")
         logger.info(f"AUTOMATION|STOPPED|User stopped automation after {run_count} runs")
-        print("Goodbye! 👋")
+        print("Goodbye!")
 
 
 if __name__ == "__main__":

@@ -279,6 +279,128 @@ def get_normalized_db_path():
     return config['paths']['database']
 
 
+def get_latest_publish_date() -> Optional[str]:
+    """
+    Get the latest (most recent) publish_date from audiobook_productions table.
+
+    Returns:
+        str: Latest publish_date in YYYYMMDDHHMMSS format, or None if no dates found
+    """
+    try:
+        # FIX: Use correct database directly
+        db_path = "database/alpha_e3_agent.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT MAX(publish_date)
+                FROM audiobook_productions
+                WHERE publish_date IS NOT NULL AND publish_date != ''
+            """)
+
+            result = cursor.fetchone()
+            return result[0] if result and result[0] else None
+
+    except Exception as e:
+        print(f"Error getting latest publish date: {e}")
+        return None
+
+
+def update_publish_date(audiobook_id: str, new_publish_date: str) -> bool:
+    """
+    Update the publish_date for a specific audiobook production.
+
+    Args:
+        audiobook_id: The audiobook production ID
+        new_publish_date: New publish date in YYYYMMDDHHMMSS format
+
+    Returns:
+        bool: True if update successful, False otherwise
+    """
+    try:
+        # FIX: Use correct database directly
+        db_path = "database/alpha_e3_agent.db"
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE audiobook_productions
+                SET publish_date = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE audiobook_id = ?
+            """, (new_publish_date, audiobook_id))
+
+            conn.commit()
+
+            if cursor.rowcount > 0:
+                print(f"   📅 Updated publish_date for {audiobook_id}: {new_publish_date}")
+                return True
+            else:
+                print(f"   ⚠️ No audiobook found with ID {audiobook_id}")
+                return False
+
+    except Exception as e:
+        print(f"Error updating publish date: {e}")
+        return False
+
+
+def calculate_next_publish_slot(audiobook_id: str) -> str:
+    """
+    Calculate the next available publish slot, ensuring 12-hour spacing between uploads.
+
+    Logic:
+    1. Get latest publish_date from database
+    2. If no previous dates or latest is in past: schedule 12 hours from now
+    3. If latest is in future: schedule 12 hours after that timestamp
+
+    Args:
+        audiobook_id: The audiobook ID (for logging purposes)
+
+    Returns:
+        str: Next publish slot in YYYYMMDDHHMMSS format
+    """
+    from datetime import timedelta
+
+    try:
+        # Get latest publish_date from database
+        latest_publish = get_latest_publish_date()
+
+        if latest_publish is None:
+            # No previous scheduling - use 12 hours from now
+            next_slot = datetime.now() + timedelta(hours=12)
+            print(f"   🕒 No previous scheduling found - scheduling 12 hours from now")
+        else:
+            # Parse latest timestamp
+            try:
+                latest_dt = datetime.strptime(latest_publish, '%Y%m%d%H%M%S')
+                now = datetime.now()
+
+                if latest_dt <= now:
+                    # Latest is in past - schedule 12 hours from now
+                    next_slot = now + timedelta(hours=12)
+                    print(f"   🕒 Latest publish date ({latest_publish}) is in past - scheduling 12 hours from now")
+                else:
+                    # Latest is in future - schedule 12 hours after that
+                    next_slot = latest_dt + timedelta(hours=12)
+                    print(f"   🕒 Latest publish date ({latest_publish}) is in future - scheduling 12 hours after that")
+
+            except ValueError:
+                # Invalid date format - fallback to 12 hours from now
+                next_slot = datetime.now() + timedelta(hours=12)
+                print(f"   ⚠️ Invalid latest publish date format ({latest_publish}) - scheduling 12 hours from now")
+
+        # Format back to YYYYMMDDHHMMSS
+        formatted_slot = next_slot.strftime('%Y%m%d%H%M%S')
+        print(f"   📅 Calculated next publish slot: {formatted_slot}")
+
+        return formatted_slot
+
+    except Exception as e:
+        # Fallback to 12 hours from now in case of any error
+        fallback_slot = (datetime.now() + timedelta(hours=12)).strftime('%Y%m%d%H%M%S')
+        print(f"   ⚠️ Error calculating publish slot: {e} - using fallback: {fallback_slot}")
+        return fallback_slot
+
+
 def find_book_input_file(book_id: str) -> str:
     """
     Find HTML input file for book using book-centric structure.
@@ -1515,45 +1637,102 @@ def upload_videos_to_youtube(book_id: str, language: str, audiobook_dict: Dict) 
             return False
         
         # Auto-managed YouTube API credentials
-        def get_youtube_credentials():
+        def validate_youtube_credentials(credentials):
+            """Validate YouTube credentials and check token status."""
+            from datetime import datetime, timezone
+
+            if not credentials:
+                return False, "No credentials provided"
+
+            if not credentials.valid:
+                if not credentials.expired:
+                    return False, "Credentials are invalid (not expired)"
+                if not credentials.refresh_token:
+                    return False, "Credentials expired and no refresh token available"
+                return False, "Credentials expired but may be refreshable"
+
+            # Check token expiry time
+            if credentials.expiry:
+                # Handle timezone-aware vs timezone-naive datetime comparison
+                if credentials.expiry.tzinfo is not None:
+                    current_time = datetime.now(timezone.utc)
+                else:
+                    current_time = datetime.now()
+
+                time_until_expiry = credentials.expiry - current_time
+                minutes_until_expiry = time_until_expiry.total_seconds() / 60
+
+                if minutes_until_expiry < 5:
+                    return False, f"Token expires in {minutes_until_expiry:.1f} minutes"
+                elif minutes_until_expiry < 30:
+                    print(f"Warning: Token expires in {minutes_until_expiry:.1f} minutes")
+
+            return True, "Credentials are valid"
+
+        def get_youtube_credentials(force_refresh=False):
             """Get YouTube credentials with automatic OAuth flow and credential management."""
             from google_auth_oauthlib.flow import InstalledAppFlow
             from google.auth.transport.requests import Request
-            
+
             credentials_file = "youtube_credentials.json"
             scopes = ['https://www.googleapis.com/auth/youtube.upload']
-            
+
             credentials = None
-            
+
             # Load existing credentials if they exist
-            if os.path.exists(credentials_file):
+            if os.path.exists(credentials_file) and not force_refresh:
                 try:
                     credentials = Credentials.from_authorized_user_file(credentials_file, scopes)
                     print(f"📄 Loaded existing YouTube credentials")
+
+                    # Validate credentials
+                    is_valid, status_msg = validate_youtube_credentials(credentials)
+                    print(f"🔍 Credential status: {status_msg}")
+
                 except Exception as e:
                     print(f"⚠️ Error loading existing credentials: {e}")
-            
+                    credentials = None
+
             # If credentials are invalid or don't exist, run OAuth flow
-            if not credentials or not credentials.valid:
-                if credentials and credentials.expired and credentials.refresh_token:
+            if not credentials or not credentials.valid or force_refresh:
+                if credentials and credentials.expired and credentials.refresh_token and not force_refresh:
                     try:
                         print(f"🔄 Refreshing expired YouTube credentials...")
                         credentials.refresh(Request())
                         print(f"✅ Credentials refreshed successfully")
+
+                        # Save refreshed credentials immediately
+                        try:
+                            with open(credentials_file, 'w') as f:
+                                f.write(credentials.to_json())
+                            print(f"💾 Refreshed credentials saved")
+                        except Exception as save_error:
+                            print(f"⚠️ Warning: Could not save refreshed credentials: {save_error}")
+
                     except Exception as e:
                         print(f"❌ Failed to refresh credentials: {e}")
+                        if "invalid_grant" in str(e).lower():
+                            print(f"🔄 Refresh token expired/revoked, need full re-authentication")
                         credentials = None
                 
                 if not credentials:
+                    # Clear old credentials file if force refresh was requested
+                    if force_refresh and os.path.exists(credentials_file):
+                        try:
+                            os.remove(credentials_file)
+                            print(f"🗑️ Removed old credentials file")
+                        except Exception as e:
+                            print(f"⚠️ Could not remove old credentials: {e}")
+
                     # Load client config from environment
                     client_id = os.getenv('YOUTUBE_CLIENT_ID')
                     client_secret = os.getenv('YOUTUBE_CLIENT_SECRET')
-                    
+
                     if not client_id or not client_secret:
                         print(f"❌ YouTube OAuth credentials missing. Required: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET")
                         print(f"📋 Get these from: https://console.cloud.google.com/apis/credentials")
                         return None
-                    
+
                     client_config = {
                         "installed": {
                             "client_id": client_id,
@@ -1564,41 +1743,87 @@ def upload_videos_to_youtube(book_id: str, language: str, audiobook_dict: Dict) 
                             "redirect_uris": ["http://localhost"]
                         }
                     }
-                    
-                    print(f"🔐 Starting YouTube OAuth flow...")
+
+                    action = "Re-authenticating" if force_refresh else "Starting"
+                    print(f"🔐 {action} YouTube OAuth flow...")
                     print(f"📱 This will open a browser window for authentication")
                     print(f"🎯 Please log in with the account that owns channel: UCyjo8L-DEJaeGuufUqMpigw")
-                    
+
                     try:
                         flow = InstalledAppFlow.from_client_config(client_config, scopes)
                         credentials = flow.run_local_server(port=0)
                         print(f"✅ YouTube OAuth authentication successful!")
-                        
+
+                        # Validate new credentials immediately
+                        is_valid, status_msg = validate_youtube_credentials(credentials)
+                        print(f"✅ New credentials validated: {status_msg}")
+
                     except Exception as e:
                         print(f"❌ OAuth authentication failed: {e}")
                         return None
-                
-                # Save credentials for future use
-                try:
-                    with open(credentials_file, 'w') as f:
-                        f.write(credentials.to_json())
-                    print(f"💾 Credentials saved to {credentials_file}")
-                except Exception as e:
-                    print(f"⚠️ Warning: Could not save credentials: {e}")
-            
+
+                # Save credentials for future use with timestamp
+                if credentials:
+                    try:
+                        from datetime import datetime
+                        credentials_data = credentials.to_json()
+
+                        with open(credentials_file, 'w') as f:
+                            f.write(credentials_data)
+
+                        # Log credential save event
+                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        print(f"💾 Credentials saved to {credentials_file} at {timestamp}")
+
+                    except Exception as e:
+                        print(f"⚠️ Warning: Could not save credentials: {e}")
+
             return credentials
         
-        # Get YouTube credentials (auto-managed)
+        # Get YouTube credentials with retry logic
+        max_retries = 2
+        credentials = None
+
+        for attempt in range(max_retries):
+            try:
+                force_refresh = attempt > 0  # Force refresh on retry
+                credentials = get_youtube_credentials(force_refresh=force_refresh)
+
+                if credentials:
+                    # Validate credentials before proceeding
+                    is_valid, status_msg = validate_youtube_credentials(credentials)
+                    if is_valid:
+                        print(f"✅ YouTube credentials ready for upload")
+                        break
+                    else:
+                        print(f"❌ Credentials validation failed: {status_msg}")
+                        if attempt < max_retries - 1:
+                            print(f"🔄 Retrying with fresh authentication...")
+                            credentials = None
+                        else:
+                            print(f"❌ Could not obtain valid YouTube credentials after {max_retries} attempts")
+                            return False
+                else:
+                    print(f"❌ Could not obtain YouTube credentials on attempt {attempt + 1}")
+                    if attempt < max_retries - 1:
+                        print(f"🔄 Retrying...")
+
+            except Exception as e:
+                print(f"❌ Error getting YouTube credentials (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 Retrying...")
+                else:
+                    return False
+
+        if not credentials:
+            print(f"❌ Failed to obtain valid YouTube credentials after {max_retries} attempts")
+            return False
+
+        # Build YouTube service
         try:
-            credentials = get_youtube_credentials()
-            if not credentials:
-                print(f"❌ Could not obtain YouTube credentials")
-                return False
-            
-            # Build YouTube service
             youtube = build('youtube', 'v3', credentials=credentials)
             print(f"✅ YouTube API service ready for uploads")
-            
+
         except Exception as e:
             print(f"❌ YouTube API setup failed: {e}")
             return False
@@ -1683,32 +1908,110 @@ Whether you're commuting, exercising, or simply relaxing, immerse yourself in th
             print(f"   Subtitle: {subtitle_path}")
             print(f"   Channel: {channel_id}")
             
-            # Convert publish date from audiobook format to YouTube format
+            # Handle automatic scheduling if no publish_date provided
             publish_date = audiobook_dict.get('publish_date')
-            youtube_publish_time = None
-            
-            if publish_date:
-                try:
-                    # Convert from YYYYMMDDHHMMSS to YouTube UTC ISO format
-                    from datetime import datetime
-                    dt = datetime.strptime(publish_date, '%Y%m%d%H%M%S')
-                    # Convert to UTC format with Z suffix (YouTube API requirement)
-                    youtube_publish_time = dt.strftime('%Y-%m-%dT%H:%M:%S.000Z')  # UTC format
 
-                    # Validate that publish time is in the future
-                    from datetime import timezone
-                    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)  # Remove timezone for comparison
-                    if dt > now_utc:
-                        print(f"   📅 Scheduled publish: {youtube_publish_time} (UTC)")
-                        print(f"   ⏰ Current time: {now_utc.strftime('%Y-%m-%dT%H:%M:%S.000Z')} (UTC)")
+            if not publish_date or publish_date == '':
+                print(f"   🕒 No publish_date found - calculating automatic scheduling...")
+
+                # Calculate next available slot with 12-hour spacing
+                calculated_date = calculate_next_publish_slot(audiobook_dict['audiobook_id'])
+
+                # Update database with calculated date
+                if update_publish_date(audiobook_dict['audiobook_id'], calculated_date):
+                    # Update local dict for current processing
+                    audiobook_dict['publish_date'] = calculated_date
+                    publish_date = calculated_date
+                    print(f"   ✅ Auto-scheduled for: {calculated_date}")
+                else:
+                    print(f"   ⚠️ Failed to update database - proceeding without scheduling")
+
+            # Convert publish date from audiobook format to YouTube format
+            youtube_publish_time = None
+
+            print(f"   🔍 TRACE: Starting publish_date processing...")
+            print(f"   🔍 TRACE: publish_date = '{publish_date}'")
+            print(f"   🔍 TRACE: publish_date type: {type(publish_date)}")
+            print(f"   🔍 TRACE: publish_date is not empty: {bool(publish_date)}")
+
+            if publish_date:
+                # Import datetime modules at function level to avoid conflicts
+                from datetime import datetime, timezone, timedelta
+
+                print(f"   🔍 TRACE: Entered datetime parsing try block")
+
+                try:
+                    # Handle different types of publish_date
+                    if isinstance(publish_date, int):
+                        # Convert integer to string (assuming it's in YYYYMMDDHHMMSS format)
+                        publish_date_str = str(publish_date)
+                        print(f"   🔧 DEBUG: Converted integer to string: {publish_date_str}")
+                    elif isinstance(publish_date, str):
+                        publish_date_str = publish_date
+                        print(f"   ✅ DEBUG: Already a string: {publish_date_str}")
                     else:
-                        print(f"   ⚠️ Publish date {youtube_publish_time} is in the past - will upload immediately")
+                        # Try to convert other types to string
+                        publish_date_str = str(publish_date)
+                        print(f"   🔧 DEBUG: Converted {type(publish_date)} to string: {publish_date_str}")
+
+                    # Validate string format and length
+                    if len(publish_date_str) != 14:
+                        print(f"   ❌ DEBUG: Invalid length {len(publish_date_str)}, expected 14 for YYYYMMDDHHMMSS format")
+                        raise ValueError(f"Invalid date format: expected 14 characters, got {len(publish_date_str)}")
+
+                    print(f"   🐛 DEBUG: About to parse: '{publish_date_str}'")
+                    print(f"   🐛 DEBUG: Length: {len(publish_date_str)}")
+
+                    # Parse the publish date (treat as Pacific Time)
+                    dt_pacific = datetime.strptime(publish_date_str, '%Y%m%d%H%M%S')
+                    print(f"   🐛 DEBUG: Parsed successfully: {dt_pacific}")
+
+                    # Convert to UTC format with Z suffix (YouTube API requirement)
+                    youtube_publish_time = dt_pacific.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+                    print(f"   🔍 TRACE: Set youtube_publish_time = '{youtube_publish_time}'")
+
+                    # Create Pacific timezone using UTC offset (PST/PDT)
+                    # Pacific Standard Time is UTC-8, Pacific Daylight Time is UTC-7
+                    # For September, it's PDT (UTC-7)
+                    pacific_offset = timedelta(hours=-7)  # PDT offset
+                    utc_now = datetime.now(timezone.utc)
+                    now_pacific = (utc_now + pacific_offset).replace(tzinfo=None)
+
+                    print(f"   🐛 DEBUG: Pacific timezone comparison:")
+                    print(f"   🐛 DEBUG: publish_date_pacific={dt_pacific}")
+                    print(f"   🐛 DEBUG: now_pacific={now_pacific}")
+
+                    comparison_result = dt_pacific > now_pacific
+                    print(f"   🐛 DEBUG: is_future_pacific={comparison_result}")
+                    print(f"   🔍 TRACE: Comparison result: {comparison_result}")
+
+                    # Validate that publish time is in the future (Pacific Time)
+                    if comparison_result:
+                        print(f"   🔍 TRACE: Date is in future - keeping youtube_publish_time")
+                        print(f"   📅 Scheduled publish: {youtube_publish_time} (UTC)")
+                        print(f"   🕐 Pacific time now: {now_pacific.strftime('%Y-%m-%d %H:%M:%S PDT')}")
+                        print(f"   🕐 Publish time (Pacific): {dt_pacific.strftime('%Y-%m-%d %H:%M:%S PDT')}")
+                        print(f"   ⏱️ Time until publish: {dt_pacific - now_pacific}")
+                    else:
+                        print(f"   🔍 TRACE: Date is in past - setting youtube_publish_time to None")
+                        print(f"   ⚠️ Publish date {youtube_publish_time} is in the past (Pacific Time)")
+                        print(f"   🐛 PAST DATE: {dt_pacific} vs {now_pacific}")
                         youtube_publish_time = None  # Force immediate upload
+                        print(f"   🔍 TRACE: youtube_publish_time set to None")
 
                 except Exception as e:
+                    print(f"   🔍 TRACE: Exception caught in datetime parsing!")
+                    print(f"   🐛 DEBUG: Exact parsing error: {e}")
+                    print(f"   🐛 DEBUG: Exception type: {type(e)}")
+                    print(f"   🐛 DEBUG: Exception args: {e.args}")
                     print(f"   ⚠️ Invalid publish date format: {publish_date}, uploading as public immediately")
                     youtube_publish_time = None
-            
+                    print(f"   🔍 TRACE: youtube_publish_time set to None due to exception")
+
+            print(f"   🔍 TRACE: Final youtube_publish_time = '{youtube_publish_time}'")
+            print(f"   🔍 TRACE: Will schedule: {bool(youtube_publish_time)}")
+            print(f"   🔍 TRACE: About to start YouTube API upload logic...")
+
             # Real YouTube API upload
             try:
                 # Generate enhanced tags
@@ -1743,7 +2046,11 @@ Whether you're commuting, exercising, or simply relaxing, immerse yourself in th
                     tags.extend([f"part {part_num}", "audiobook series"])
                 
                 # Prepare video metadata
+                print(f"   🔍 TRACE: Preparing video metadata...")
+                print(f"   🔍 TRACE: youtube_publish_time check: '{youtube_publish_time}' (bool: {bool(youtube_publish_time)})")
+
                 if youtube_publish_time:
+                    print(f"   🔍 TRACE: Taking SCHEDULED upload path")
                     # For scheduled publishing, upload as private
                     video_status = {
                         "privacyStatus": "private",  # Will auto-publish at scheduled time
@@ -1751,13 +2058,16 @@ Whether you're commuting, exercising, or simply relaxing, immerse yourself in th
                         "selfDeclaredMadeForKids": False
                     }
                     print(f"   📅 Scheduled for: {youtube_publish_time}")
+                    print(f"   🔍 TRACE: video_status = {video_status}")
                 else:
+                    print(f"   🔍 TRACE: Taking IMMEDIATE upload path")
                     # For immediate publishing, upload as public
                     video_status = {
                         "privacyStatus": "public",
                         "selfDeclaredMadeForKids": False
                     }
                     print(f"   🔴 Publishing immediately")
+                    print(f"   🔍 TRACE: video_status = {video_status}")
                 
                 video_metadata = {
                     "snippet": {
@@ -1920,3 +2230,112 @@ def add_book_metadata_to_first_chunk(book_id: str, language: str, book_name: str
     except Exception as e:
         print(f"❌ Failed to add metadata: {e}")
         return False
+
+
+def check_youtube_token_status():
+    """Check the status of YouTube credentials without performing operations."""
+    import os
+    from datetime import datetime, timezone
+    from google.oauth2.credentials import Credentials
+
+    credentials_file = "youtube_credentials.json"
+
+    if not os.path.exists(credentials_file):
+        return {
+            'status': 'missing',
+            'message': 'No credentials file found',
+            'valid': False
+        }
+
+    try:
+        scopes = ['https://www.googleapis.com/auth/youtube.upload']
+        credentials = Credentials.from_authorized_user_file(credentials_file, scopes)
+
+        # Get detailed status
+        status_info = {
+            'valid': credentials.valid,
+            'expired': credentials.expired if hasattr(credentials, 'expired') else None,
+            'has_refresh_token': bool(credentials.refresh_token),
+            'expiry': None,
+            'minutes_until_expiry': None
+        }
+
+        if credentials.expiry:
+            status_info['expiry'] = credentials.expiry.isoformat()
+
+            # Handle timezone-aware vs timezone-naive datetime comparison
+            if credentials.expiry.tzinfo is not None:
+                current_time = datetime.now(timezone.utc)
+            else:
+                current_time = datetime.now()
+
+            time_until_expiry = credentials.expiry - current_time
+            status_info['minutes_until_expiry'] = time_until_expiry.total_seconds() / 60
+
+        if credentials.valid:
+            if status_info['minutes_until_expiry'] and status_info['minutes_until_expiry'] < 5:
+                status_info['status'] = 'expiring_soon'
+                status_info['message'] = f"Token expires in {status_info['minutes_until_expiry']:.1f} minutes"
+            else:
+                status_info['status'] = 'valid'
+                status_info['message'] = 'Credentials are valid and ready'
+        elif credentials.expired:
+            if credentials.refresh_token:
+                status_info['status'] = 'expired_refreshable'
+                status_info['message'] = 'Token expired but can be refreshed'
+            else:
+                status_info['status'] = 'expired_no_refresh'
+                status_info['message'] = 'Token expired and no refresh token available'
+        else:
+            status_info['status'] = 'invalid'
+            status_info['message'] = 'Credentials are invalid'
+
+        return status_info
+
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f'Error reading credentials: {e}',
+            'valid': False
+        }
+
+
+def force_youtube_reauth():
+    """Force YouTube re-authentication by clearing existing credentials."""
+    import os
+
+    credentials_file = "youtube_credentials.json"
+
+    # Remove existing credentials
+    if os.path.exists(credentials_file):
+        try:
+            os.remove(credentials_file)
+            print(f"Removed existing credentials file: {credentials_file}")
+        except Exception as e:
+            print(f"Error removing credentials file: {e}")
+            return False
+
+    print(f"SUCCESS: Credentials cleared. Next YouTube operation will trigger re-authentication.")
+    return True
+
+
+def validate_youtube_credentials_standalone():
+    """Standalone function to validate YouTube credentials."""
+    status = check_youtube_token_status()
+
+    print(f"YouTube Credential Status Report")
+    print(f"=" * 40)
+    print(f"Status: {status['status']}")
+    print(f"Message: {status['message']}")
+    print(f"Valid: {status['valid']}")
+
+    if 'expiry' in status and status['expiry']:
+        print(f"Expires: {status['expiry']}")
+
+    if 'minutes_until_expiry' in status and status['minutes_until_expiry']:
+        print(f"Minutes until expiry: {status['minutes_until_expiry']:.1f}")
+
+    if 'has_refresh_token' in status:
+        print(f"Has refresh token: {status['has_refresh_token']}")
+
+    return status

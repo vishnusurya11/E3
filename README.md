@@ -386,3 +386,16 @@ robocopy D:\Projects\pheonix\prod\E3\E3\comfyui_agent comfyui_agent /E
 If running E3 in WSL but ComfyUI on Windows:
 - Start ComfyUI with: `python main.py --listen 0.0.0.0 --port 8000`
 - See WSL_COMFYUI_SETUP.md for details
+
+
+
+
+Notes for me:
+
+for now I run below 2 .. will bundle later for nwo individual testing i need to run thse below commands
+.venv\Scripts\activate
+
+python initialize.py - only once
+python -m comfyui_agent.cli start --ui-port 8081
+python audiobook_agent/audiobook_cli.py
+python gutenberg_agent/gutenberg_cli.py

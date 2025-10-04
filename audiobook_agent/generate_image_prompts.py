@@ -87,74 +87,110 @@ ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 CLAUDE_API_KEY = os.getenv('CLAUDE_API_KEY')
 TAVILY_API_KEY = os.getenv('TAVILY_API_KEY')
 
-# Expanded high-quality example prompts for multi-shot learning
+# Multi-scene artistic thumbnail examples optimized for YouTube
 EXAMPLE_PROMPTS = {
     'mystery_thriller': [
-        """Create a cinematic audiobook thumbnail for "The Secret Adversary", featuring Jane Finn clutching a waterproof oilskin packet as she's helped into a lifeboat from the sinking Lusitania, her face pale with terror while knowing she carries papers that could change the war, conveying the moment that starts everything. Utilize a dramatic historical disaster style, incorporating the tilting ship deck, lifeboats being lowered, the precious treaty packet, and Jane's desperate grip. Employ emergency flare lighting against night ocean, with a palette of distress orange, night sea blacks, and the oilskin packet's brown leather. Design with "Agatha Christie" in period maritime font, "The Secret Adversary" in urgent telegram style, and "Narrated by Rowan Whitmore" in ship's log type. Add smoke and spray effects.""",
-        
-        """Create a cinematic audiobook thumbnail for "The Secret Adversary", showing Tommy and Tuppence outside the Ritz hotel holding their homemade "Young Adventurers Ltd" business card while shadowy figures watch from windows and doorways, with Mr. Whittington's sinister silhouette approaching, conveying innocent ambition meeting danger. Utilize a film noir style with 1920s London detail, incorporating the Ritz facade, hand-drawn business card, multiple watching shadows, and the approaching threat. Employ afternoon light with multiple shadow sources, using a palette of London stone grays, business card white, and menacing shadow purples. Position "Agatha Christie" in Ritz hotel font, "The Secret Adversary" in adventurous hand-lettered style, and "Narrated by Rowan Whitmore" in professional type. Add fog wisps and window glints.""",
+        """Create an artistic audiobook thumbnail for "The Secret Adversary" combining 4 iconic elements in vintage poster illustration style: (1) the sinking Lusitania tilted dramatically in the background with orange emergency flares, (2) Jane Finn's terrified face in the foreground clutching the oilskin treaty packet, (3) shadowy silhouettes of Tommy and Tuppence investigating in 1920s detective attire, (4) Mr. Whittington's menacing profile looming over the scene. Use a bold art deco graphic novel aesthetic with strong geometric shapes and dramatic angular compositions. Employ a high-contrast color palette of deep navy blues, burning oranges, vintage cream, and danger reds that pops on small screens. Integrate "AGATHA CHRISTIE" in bold art deco gold lettering at top, "The Secret Adversary" in large hand-lettered adventure font with shadow effects across center, and "Narrated by Rowan Whitmore" in clean vintage typewriter font at bottom. Layer elements with atmospheric fog, mysterious shadows, and period texture overlays.""",
 
-        """Create a cinematic audiobook thumbnail for "The Secret Adversary", featuring the moment in the Soho house where Tommy discovers Jane Finn held captive, her face showing both relief and terror as chloroform-soaked cloth looms behind her, while Rita/Marguerite's treacherous figure appears in the doorway, conveying rescue and betrayal. Utilize a tense interior scene style, incorporating Victorian room details, Jane's captive position, the chloroform threat, and multiple dangers. Employ single gas lamp creating dramatic shadows, with a palette of sickroom yellows, chloroform bottle green, and betrayal reds. Display "Agatha Christie" in Victorian house number font, "The Secret Adversary" in shadow-cast letters, and "Narrated by Rowan Whitmore" in period script. Add gas light flicker and menace atmosphere."""
+        """Create an illustrated audiobook thumbnail for "The Secret Adversary" in 1920s travel poster style, combining 3 key scenes: (1) the Ritz hotel facade with dramatic perspective and art nouveau details, (2) Tommy and Tuppence's "Young Adventurers Ltd" business card rendered as oversized focal element with hand-drawn typography, (3) multiple sinister watching eyes and shadowy figures emerging from windows and doorways creating paranoid atmosphere. Use a bold graphic design approach with limited color palette of London fog grays, business card stark white, shadowy purples, and accent gold. Apply strong geometric framing with ornate borders. Position "AGATHA CHRISTIE" in elegant art nouveau flowing letters, "THE SECRET ADVERSARY" in massive bold sans-serif caps that command attention, and "Narrated by Rowan Whitmore" in refined script. Add vintage halftone texture, strategic lighting halos, and mystery atmosphere.""",
+
+        """Create a noir graphic novel style audiobook thumbnail for "The Secret Adversary" layering 4 dramatic moments: (1) Victorian Soho house exterior in stark architectural angles, (2) Jane Finn's face split-screen showing relief and terror, (3) chloroform bottle and cloth as menacing foreground elements, (4) Rita/Marguerite's treacherous silhouette in doorway. Use high-contrast illustrated style reminiscent of vintage pulp fiction covers with bold blacks, sickroom yellows, poison bottle greens, and betrayal crimsons. Apply dramatic shadow patterns and strong diagonal compositions. Integrate "AGATHA CHRISTIE" in bold condensed serif with shadow effect, "The Secret Adversary" in large impactful blackletter-style display font, and "Narrated by Rowan Whitmore" in clean gothic type. Layer with venetian blind shadows, gas lamp glow effects, and tension atmosphere."""
     ],
-    
+
     'classic_adventure': [
-        """Create a cinematic audiobook thumbnail for "The Lost World", set on a prehistoric plateau shrouded in mist, featuring the silhouette of a massive Tyrannosaurus Rex roaring against a blood-red sunset, with tiny Victorian explorers visible at the bottom for scale, conveying danger and discovery. Utilize an art style inspired by vintage adventure posters with modern digital painting techniques, incorporating key visual elements such as pterodactyls circling overhead, ancient ferns, volcanic peaks, and expedition equipment. Employ dramatic backlighting to enhance the prehistoric atmosphere, with a color palette of deep oranges, jungle greens, and volcanic reds. Design with "Sir Arthur Conan Doyle" in bold Victorian serif fonts at the top, "The Lost World" in massive stone-textured letters across the center, and "Narrated by Rowan Whitmore" in clean sans-serif at the bottom. Add atmospheric fog and dust particles.""",
-        
-        """Create a cinematic audiobook thumbnail for "The Lost World", featuring Professor Challenger's expedition team standing at the edge of a sheer cliff, gazing up at a colossal brachiosaurus whose head towers above prehistoric trees, conveying awe and scientific wonder. Utilize a photorealistic art style with painterly elements, incorporating dense jungle foliage, mysterious caves, Victorian-era rifles, and field notebooks. Employ golden hour lighting filtering through primeval forest canopy, with a palette of lush greens, earthy browns, and misty blues. Position "Sir Arthur Conan Doyle" in elegant copper-plated serif fonts, "The Lost World" in bold adventure-style lettering with vine embellishments, and "Narrated by Rowan Whitmore" in period-appropriate typography. Add light rays and floating pollen effects."""
+        """Create a bold illustrated audiobook thumbnail for "The Lost World" in vintage adventure poster style, combining 5 iconic elements: (1) massive T-Rex silhouette roaring against blood-red sunset sky, (2) Victorian explorers tiny at bottom for dramatic scale, (3) pterodactyls circling in stylized geometric patterns, (4) prehistoric plateau with angular volcanic peaks, (5) vintage expedition equipment (rifles, notebooks, maps) framing the edges. Use retro national park poster aesthetic with bold flat colors and strong silhouettes. Employ vibrant palette of sunset oranges, jungle teals, volcanic reds, and explorer khakis that grabs attention. Design "SIR ARTHUR CONAN DOYLE" in adventure serial caps at top, "THE LOST WORLD" in massive stone-texture display letters dominating center with crack effects, "Narrated by Rowan Whitmore" in clean expedition stencil font. Add stylized mist, dramatic lighting rays, and period adventure atmosphere.""",
+
+        """Create an art nouveau illustrated audiobook thumbnail for "The Lost World" layering 4 dramatic scenes: (1) towering brachiosaurus rendered in elegant flowing lines emerging from decorative frame, (2) Professor Challenger and expedition team as stylized figures with Victorian costume details at cliff edge, (3) prehistoric jungle with art nouveau ornamental ferns and vines creating border elements, (4) mysterious cave entrance with glowing interior. Use decorative poster illustration style with flowing organic shapes and ornate details. Apply rich palette of emerald greens, copper browns, misty lavenders, and gold accents. Position "SIR ARTHUR CONAN DOYLE" in elegant art nouveau flowing script, "The Lost World" in large bold display font with vine embellishments and decorative flourishes, "Narrated by Rowan Whitmore" in period-appropriate refined type. Layer with stylized light rays, floating pollen patterns, and prehistoric wonder atmosphere."""
     ],
-    
+
     'literary_drama': [
-        """Create a cinematic audiobook thumbnail for "A Tale of Two Cities", featuring a split composition with revolutionary Paris ablaze on one side and peaceful London fog on the other, divided by a guillotine blade that reflects both cities, conveying duality and fate. Utilize a dramatic contrast style mixing chaos and calm, incorporating burning buildings, Big Ben silhouette, revolutionary crowds, and Georgian architecture. Employ fire glow versus gaslight illumination, with a palette of revolution reds, London grays, and blood crimson. Design with "Charles Dickens" in elegant Victorian serif, "A Tale of Two Cities" in bold divided letters, and "Narrated by Rowan Whitmore" in classic type. Add smoke and crowd movement effects.""",
-        
-        """Create a cinematic audiobook thumbnail for "A Tale of Two Cities", showing a wine cask broken in the streets with red wine flowing like blood between cobblestones, while desperate figures drink from the ground and "BLOOD" appears written on the wall, conveying foreshadowing revolution. Utilize a gritty realism style, incorporating spilled wine, weathered hands, stone textures, and ominous writing. Employ harsh street-level lighting, with a palette of wine reds, stone grays, and poverty browns. Display "Charles Dickens" in wine-stained letters, "A Tale of Two Cities" in dripping font, and "Narrated by Rowan Whitmore" in steady type. Add cobblestone texture and liquid flow effects."""
+        """Create a bold split-composition audiobook thumbnail for "A Tale of Two Cities" in dramatic graphic novel style, combining 5 iconic elements: (1) revolutionary Paris with stylized flames and burning buildings in geometric shapes on left half, (2) peaceful London with Big Ben silhouette in fog on right half, (3) massive guillotine blade vertically dividing the composition reflecting both cities, (4) revolutionary crowd rendered as angular silhouettes with raised fists and weapons, (5) Georgian architecture details framing the edges. Use high-contrast illustrated poster aesthetic with bold shapes and strong graphic design. Employ striking palette of revolution reds, flame oranges, London slate grays, blood crimsons, and dramatic blacks that pops instantly. Design "CHARLES DICKENS" in elegant Victorian serif caps with embossing effect, "A TALE OF TWO CITIES" in massive bold divided letterforms that mirror the split composition, "Narrated by Rowan Whitmore" in classic refined type. Layer with smoke effects, crowd movement patterns, and revolutionary atmosphere.""",
+
+        """Create an expressive illustrated audiobook thumbnail for "A Tale of Two Cities" in vintage woodcut style, layering 4 powerful symbols: (1) broken wine cask center-stage with dramatic perspective, (2) red wine flowing like blood through cobblestones in bold graphic patterns, (3) desperate hands reaching and drinking rendered in angular shapes, (4) ominous "BLOOD" text written on wall integrated as typography element. Use bold graphic illustration reminiscent of revolutionary propaganda posters with strong blacks and limited colors. Apply palette of wine deep reds, cobblestone grays, poverty browns, and stark whites for contrast. Position "CHARLES DICKENS" in distressed letterpress font with texture, "A Tale of Two Cities" in large dripping display letters that echo the wine/blood theme, "Narrated by Rowan Whitmore" in steady classical serif. Add woodcut texture, liquid flow patterns, and ominous foreshadowing atmosphere."""
     ],
 
     'gothic_supernatural': [
-        """Create a cinematic audiobook thumbnail for "Dracula", set in a Gothic cathedral library where stained glass windows cast colored light through an ornate iron lantern, illuminating ancient tomes that float and whisper their stories. Include gargoyles wearing headphones, illuminated manuscripts transforming into audio visualizations, and mysterious monks carrying glowing books. Use a palette of jewel-toned stained glass colors, deep stone grays, and warm candle glow. Place "Bram Stoker" in cathedral stone carving font, "Dracula" in Gothic blackletter fonts with gold leaf effects, and "Narrated by [Narrator]" in brass nameplate type. Add divine light rays and mystical atmosphere."""
+        """Create a mystical illustrated audiobook thumbnail for "Dracula" in gothic art nouveau style, combining 5 atmospheric elements: (1) cathedral gothic arches with elaborate ornamental details framing the composition, (2) stained glass windows casting jewel-toned geometric light patterns, (3) ancient floating tomes with decorative illuminated manuscript details, (4) ornate iron lantern as central glowing focal point, (5) mysterious shadow figures and vampire bat silhouettes. Use decorative poster illustration with elaborate borders and ornamental details. Employ rich palette of stained glass ruby reds, sapphire blues, emerald greens, cathedral stone grays, and candlelight golds. Design "BRAM STOKER" in gothic stone-carved capitals with shadowing, "DRACULA" in massive blackletter display font with gold leaf effects and blood-red accents, "Narrated by [Narrator]" in elegant brass nameplate script. Layer with divine light rays, mystical atmosphere effects, and gothic grandeur."""
     ]
 }
+
+
+def validate_model_packages():
+    """Validate that required packages are installed for multi-model support."""
+    issues = []
+
+    # Check Gemini package
+    try:
+        import langchain_google_genai
+    except ImportError:
+        issues.append("⚠️  langchain-google-genai NOT installed - Gemini models will fall back to OpenAI")
+
+    # Check Anthropic package
+    try:
+        import langchain_anthropic
+    except ImportError:
+        issues.append("⚠️  langchain-anthropic NOT installed - Claude models will fall back to OpenAI")
+
+    if issues:
+        print("\n" + "="*70)
+        print("🚨 PACKAGE VALIDATION WARNINGS:")
+        for issue in issues:
+            print(f"  {issue}")
+        print("="*70 + "\n")
+
+    return len(issues) == 0
 
 
 def get_llm(model_name: str, temperature: float = DEFAULT_TEMPERATURE):
     """Get the appropriate LLM based on model name."""
     model_lower = model_name.lower()
-    
-    try:
-        if 'gpt' in model_lower or 'openai' in model_lower:
+
+    # Only catch ImportError and ValueError (missing packages/keys)
+    # Let other errors (quota, network, etc.) bubble up normally
+    if 'gpt' in model_lower or 'openai' in model_lower:
+        if not OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY not found in environment")
+        return ChatOpenAI(model=model_name, api_key=OPENAI_API_KEY, temperature=temperature)
+
+    elif 'gemini' in model_lower or 'google' in model_lower:
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            api_key = GOOGLE_API_KEY or GEMINI_API_KEY
+            if not api_key:
+                raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not found in environment")
+            return ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=temperature)
+        except ImportError:
+            print(f"🚨 WARNING: langchain_google_genai not installed! Falling back to OpenAI for {model_name}")
+            print("   Install with: pip install langchain-google-genai")
             if not OPENAI_API_KEY:
-                raise ValueError("OPENAI_API_KEY not found in environment")
-            return ChatOpenAI(model=model_name, api_key=OPENAI_API_KEY, temperature=temperature)
-        
-        elif 'gemini' in model_lower or 'google' in model_lower:
-            try:
-                from langchain_google_genai import ChatGoogleGenerativeAI
-                api_key = GOOGLE_API_KEY or GEMINI_API_KEY
-                if not api_key:
-                    raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not found in environment")
-                return ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=temperature)
-            except ImportError:
-                print("Warning: langchain_google_genai not installed, falling back to OpenAI")
-                return ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY, temperature=temperature)
-        
-        elif 'claude' in model_lower or 'anthropic' in model_lower:
-            try:
-                from langchain_anthropic import ChatAnthropic
-                api_key = ANTHROPIC_API_KEY or CLAUDE_API_KEY
-                if not api_key:
-                    raise ValueError("ANTHROPIC_API_KEY or CLAUDE_API_KEY not found in environment")
-                return ChatAnthropic(model=model_name, anthropic_api_key=api_key, temperature=temperature)
-            except ImportError:
-                print("Warning: langchain_anthropic not installed, falling back to OpenAI")
-                return ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY, temperature=temperature)
-        
-        else:
-            # Default to OpenAI for unknown models
-            print(f"Warning: Unknown model {model_name}, using OpenAI GPT-4o")
+                raise ValueError("Gemini package missing AND OPENAI_API_KEY not found - cannot proceed")
             return ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY, temperature=temperature)
-            
-    except Exception as e:
-        print(f"Error creating {model_name} LLM: {e}")
-        print("Falling back to OpenAI GPT-4o")
+        except ValueError as e:
+            print(f"🚨 ERROR: {e}")
+            raise
+
+    elif 'claude' in model_lower or 'anthropic' in model_lower:
+        try:
+            from langchain_anthropic import ChatAnthropic
+            api_key = ANTHROPIC_API_KEY or CLAUDE_API_KEY
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY or CLAUDE_API_KEY not found in environment")
+            return ChatAnthropic(model=model_name, anthropic_api_key=api_key, temperature=temperature)
+        except ImportError:
+            print(f"🚨 WARNING: langchain_anthropic not installed! Falling back to OpenAI for {model_name}")
+            print("   Install with: pip install langchain-anthropic")
+            if not OPENAI_API_KEY:
+                raise ValueError("Anthropic package missing AND OPENAI_API_KEY not found - cannot proceed")
+            return ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY, temperature=temperature)
+        except ValueError as e:
+            print(f"🚨 ERROR: {e}")
+            raise
+
+    else:
+        # Default to OpenAI for unknown models
+        print(f"⚠️  Unknown model {model_name}, using OpenAI GPT-4o")
+        if not OPENAI_API_KEY:
+            raise ValueError("Unknown model AND OPENAI_API_KEY not found - cannot proceed")
         return ChatOpenAI(model="gpt-4o", api_key=OPENAI_API_KEY, temperature=temperature)
 
 
@@ -398,200 +434,206 @@ def extract_basic_context(research_results: List[str]) -> str:
 # Enhanced Agent Council - Each agent generates 6 prompts for 24 total candidates
 AGENT_ROLES = {
     'cinematic_director': {
-        'name': 'Cinematic Director',
-        'description': 'Creates movie-quality visual compositions with specific cinematic techniques',
-        'prompt': """You are a Cinematic Director specializing in creating movie-poster-quality audiobook thumbnails. Your expertise is in dramatic visual storytelling through composition, lighting, and cinematic techniques.
+        'name': 'Artistic Composition Director',
+        'description': 'Creates bold multi-scene illustrated compositions optimized for YouTube thumbnails',
+        'prompt': """You are an Artistic Composition Director specializing in creating YouTube-optimized audiobook thumbnails. Your expertise is in combining multiple iconic scenes into bold illustrated compositions that grab attention instantly.
 
 ASSIGNMENT:
 - Book: "{book_title}" by {author}
 - Narrator: {narrated_by}
+- Platform: YouTube (must work at small thumbnail size)
 {part_info}
 
 STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, research "{book_title}" by {author} to understand:
-- Main characters, their relationships and distinctive traits
-- Key plot points, dramatic moments, and turning points
-- Setting, time period, and atmospheric details
-- Major themes, conflicts, and visual symbolism
-- Genre conventions and mood
+Before creating prompts, research "{book_title}" by {author} to identify:
+- 4-5 most iconic visual moments that define the story
+- Main characters with distinctive visual characteristics
+- Key symbolic objects or props that represent the narrative
+- Setting details and time period visual elements
+- Color themes and emotional atmosphere
 
-STEP 2 - STUDY CINEMATIC EXAMPLES:
+STEP 2 - STUDY ARTISTIC THUMBNAIL EXAMPLES:
 {example_prompts}
 
-STEP 3 - CREATE 6 CINEMATIC PROMPTS:
-Based on your research, create exactly 6 thumbnail prompts that demonstrate CINEMATIC MASTERY.
+STEP 3 - CREATE 6 MULTI-SCENE ARTISTIC PROMPTS:
+Based on your research, create exactly 6 thumbnail prompts that combine 3-5 iconic elements in artistic illustrated styles.
 
-Requirements for each prompt:
-- Use specific story elements from your research (characters, scenes, objects)
-- Apply cinematic techniques (camera angles, lighting, composition)
-- Include atmospheric details from the book's setting
-- Show dynamic character positioning and meaningful poses
-- Use color psychology that enhances the book's emotional impact
-- Typography integration: "{author}" in [appropriate style], "{book_title}" in [dramatic style], "Narrated by {narrated_by}" in [professional style]
+CRITICAL REQUIREMENTS for each prompt:
+- COMBINE 3-5 distinct story elements/scenes in ONE composition (layered, split-screen, or collage arrangement)
+- SPECIFY artistic style: vintage poster, graphic novel, art deco, art nouveau, woodcut, etc. - NO photorealism
+- USE bold, high-contrast color palette that pops on YouTube's interface (list specific colors)
+- DESIGN typography as visual element: "{author}" in [specific artistic font style], "{book_title}" in [bold attention-grabbing display font], "Narrated by {narrated_by}" in [clean readable style]
+- ENSURE clarity at mobile thumbnail size with clear focal points
+- LAYER atmospheric effects (textures, patterns, lighting) appropriate to artistic style
 {part_instruction}
 
 IMPORTANT OUTPUT FORMAT:
-- Each prompt starts with: "Create a cinematic audiobook thumbnail for..."
+- Each prompt starts with: "Create an artistic audiobook thumbnail for..." or "Create an illustrated audiobook thumbnail for..."
 - Do NOT use numbered lists, markdown headers, or separators
 - Generate 6 complete, standalone prompts
 - Each prompt should be a single paragraph
 - No "Prompt 1:", "###", or numbering
 
-Generate exactly 6 distinct, movie-quality prompts based on the actual book content you researched."""
+Generate exactly 6 distinct, multi-scene illustrated prompts optimized for YouTube thumbnails based on actual book content."""
     },
     
     'story_architect': {
-        'name': 'Story Architect',
-        'description': 'Designs thumbnails based on specific plot points and character moments',
-        'prompt': """You are a Story Architect who creates thumbnails based on the actual story content of "{book_title}" by {author}. Your expertise is in translating key plot moments into compelling visual narratives.
+        'name': 'Story Visual Architect',
+        'description': 'Creates multi-layered illustrated thumbnails combining key plot moments and characters',
+        'prompt': """You are a Story Visual Architect who creates illustrated thumbnails that combine multiple story moments from "{book_title}" by {author}. Your expertise is in layering 3-5 key narrative elements into bold artistic compositions.
 
 ASSIGNMENT:
 - Book: "{book_title}" by {author}
 - Narrator: {narrated_by}
+- Goal: Combine multiple story moments in illustrated style
 {part_info}
 
 STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, thoroughly research "{book_title}" by {author} to understand:
-- Main characters: names, personalities, relationships, distinctive appearance
-- Key plot points: major events, conflicts, turning points, climactic moments
-- Settings: specific locations, time period, architectural details, atmosphere
-- Important objects: symbols, props, items that appear in the story
-- Themes and mood: emotional tone, genre elements, narrative style
+Before creating prompts, thoroughly research "{book_title}" by {author} to identify:
+- 4-5 most memorable plot moments that fans recognize instantly
+- Main characters with distinctive visual traits and relationships
+- Symbolic objects, props, or locations central to the plot
+- Visual metaphors representing themes and conflicts
+- Time period details and atmospheric setting elements
 
-STEP 2 - STUDY REFERENCE EXAMPLES:
+STEP 2 - STUDY MULTI-SCENE EXAMPLES:
 {example_prompts}
 
-STEP 3 - CREATE 6 STORY-SPECIFIC PROMPTS:
-Based on your research, create exactly 6 thumbnails featuring SPECIFIC STORY ELEMENTS.
+STEP 3 - CREATE 6 MULTI-LAYERED STORY PROMPTS:
+Based on your research, create exactly 6 thumbnails combining 3-5 story elements in artistic illustrated styles.
 
-Requirements for each prompt:
-- Reference actual scenes, conflicts, or turning points from your research
-- Show specific character relationships, tensions, or emotional moments
-- Include actual locations, time periods, or environments from the book
-- Use real objects, imagery, or metaphors that appear in the plot
-- Capture authentic moments of suspense, revelation, or conflict
-- Ensure visuals match the book's actual tone and themes
-- Typography specification: "{author}" in [appropriate font], "{book_title}" in [bold impactful style], "Narrated by {narrated_by}" in [clean readable type]
+CRITICAL REQUIREMENTS for each prompt:
+- COMBINE 3-5 specific plot moments/elements in ONE illustrated composition
+- SPECIFY artistic illustration style: poster art, graphic novel, vintage illustration, etc. - NO photorealism
+- LAYER story elements using split-screen, foreground/background, or collage techniques
+- USE bold color palette with high contrast that reflects the book's emotional tone
+- INTEGRATE typography creatively: "{author}" in [specific artistic font], "{book_title}" in [large bold display font], "Narrated by {narrated_by}" in [readable style]
+- INCLUDE recognizable story-specific details fans would identify
+- ENSURE mobile-friendly clarity with distinct focal points
 {part_instruction}
 
 IMPORTANT OUTPUT FORMAT:
-- Each prompt starts with: "Create a cinematic audiobook thumbnail for..."
+- Each prompt starts with: "Create an illustrated audiobook thumbnail for..." or "Create an artistic audiobook thumbnail for..."
 - Do NOT use numbered lists, markdown headers, or separators
 - Generate 6 complete, standalone prompts
 - Each prompt should be a single paragraph
 - No "Prompt 1:", "###", or numbering
 
-Generate exactly 6 story-specific prompts that fans of the book would instantly recognize from your research."""
+Generate exactly 6 multi-layered illustrated prompts combining specific story elements that book fans will instantly recognize."""
     },
     
     'visual_psychologist': {
-        'name': 'Visual Psychologist', 
-        'description': 'Creates thumbnails optimized for human psychology and YouTube engagement',
-        'prompt': """You are a Visual Psychologist specializing in YouTube thumbnail optimization. Your expertise is in understanding what makes people click, using color psychology, emotional triggers, and visual hierarchy.
+        'name': 'Thumbnail Psychology Specialist',
+        'description': 'Creates attention-grabbing multi-element illustrated thumbnails optimized for YouTube clicks',
+        'prompt': """You are a Thumbnail Psychology Specialist who creates click-optimized illustrated thumbnails for YouTube. Your expertise is in combining multiple visual hooks using color psychology, emotional triggers, and bold artistic design.
 
 ASSIGNMENT:
 - Book: "{book_title}" by {author}
-- Platform: YouTube audiobook audience
+- Platform: YouTube (competing with thousands of videos)
 - Narrator: {narrated_by}
+- Goal: Maximum click-through rate at thumbnail size
 {part_info}
 
 STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, research "{book_title}" by {author} to understand:
-- Genre and target audience expectations
-- Emotional themes and psychological elements
-- Visual symbolism and metaphors in the story
-- Character dynamics that create emotional hooks
-- Story elements that trigger curiosity and engagement
+Before creating prompts, research "{book_title}" by {author} to identify:
+- Most emotionally compelling moments that trigger curiosity
+- Visual elements that create instant intrigue or excitement
+- Color themes and psychological associations
+- Character dynamics or conflicts that hook viewers
+- Mysterious or dramatic story elements that beg questions
 
-STEP 2 - STUDY PROVEN EXAMPLES:
+STEP 2 - STUDY CLICK-OPTIMIZED EXAMPLES:
 {example_prompts}
 
-STEP 3 - CREATE 6 PSYCHOLOGY-OPTIMIZED PROMPTS:
-Based on your research, create exactly 6 psychologically-optimized thumbnails.
+STEP 3 - CREATE 6 CLICK-OPTIMIZED MULTI-ELEMENT PROMPTS:
+Based on your research, create exactly 6 thumbnails combining 3-5 attention-grabbing elements in bold illustrated styles.
 
-Requirements for each prompt:
-- Use story elements that trigger curiosity, excitement, or intrigue instantly
-- Apply colors that command attention and convey the book's emotions
-- Guide the eye to the most important story elements first
-- Ensure the thumbnail stands out in YouTube feeds using book-specific imagery
-- Design for small screens where most viewing happens
-- Include story elements that convey quality and professionalism
-- Strategic text placement: "{author}" in [credible style], "{book_title}" in [attention-grabbing design], "Narrated by {narrated_by}" in [trustworthy font]
+CRITICAL REQUIREMENTS for each prompt:
+- COMBINE 3-5 emotionally compelling story elements in ONE illustrated composition
+- USE attention-grabbing artistic style: bold poster art, high-contrast graphic design, vibrant illustration - NO photorealism
+- APPLY color psychology: bold, saturated, contrasting colors that pop against YouTube's white interface
+- CREATE clear visual hierarchy: most important element largest/brightest, secondary elements support
+- DESIGN for mobile screens: large focal points, high contrast, readable at 320px width
+- INTEGRATE typography boldly: "{author}" in [credible artistic font], "{book_title}" in [MASSIVE attention-grabbing display font], "Narrated by {narrated_by}" in [professional readable style]
+- TRIGGER emotional response: curiosity, excitement, intrigue, wonder through visual choices
 {part_instruction}
 
 IMPORTANT OUTPUT FORMAT:
-- Each prompt starts with: "Create a cinematic audiobook thumbnail for..."
+- Each prompt starts with: "Create an attention-grabbing illustrated audiobook thumbnail for..." or "Create a bold artistic audiobook thumbnail for..."
 - Do NOT use numbered lists, markdown headers, or separators
 - Generate 6 complete, standalone prompts
 - Each prompt should be a single paragraph
 - No "Prompt 1:", "###", or numbering
 
-Generate exactly 6 click-optimized prompts based on your book research that will maximize engagement."""
+Generate exactly 6 psychology-optimized multi-element illustrated prompts designed to maximize clicks on YouTube."""
     },
     
     'genre_specialist': {
-        'name': 'Genre Specialist',
-        'description': 'Ensures perfect genre accuracy with deep knowledge of visual conventions',
-        'prompt': """You are a Genre Specialist who creates thumbnails that perfectly capture genre expectations while being distinctive. Your role is to research the book and understand its genre conventions.
+        'name': 'Genre Visual Specialist',
+        'description': 'Creates genre-perfect multi-element illustrated thumbnails with artistic flair',
+        'prompt': """You are a Genre Visual Specialist who creates illustrated thumbnails that combine genre conventions with artistic innovation. Your role is to layer multiple genre-appropriate visual elements in bold artistic styles.
 
 ASSIGNMENT:
 - Book: "{book_title}" by {author}
 - Narrator: {narrated_by}
-- Target: Genre fans and curious browsers
+- Goal: Combine genre authenticity with artistic illustration
 {part_info}
 
 STEP 1 - RESEARCH THE BOOK:
 Before creating prompts, research "{book_title}" by {author} to understand:
-- What genre this book belongs to (mystery, romance, adventure, historical, etc.)
-- Visual conventions and symbols that fans of this genre expect
-- Color palettes and mood associated with this genre
-- Typical imagery and iconography for this type of story
-- How this specific book fits or subverts genre expectations
+- Primary genre and visual conventions (mystery, gothic, adventure, literary, etc.)
+- 3-5 iconic genre symbols or imagery fans expect to see
+- Genre-appropriate color palettes and emotional atmosphere
+- Artistic styles historically associated with this genre (noir, art nouveau, pulp covers, etc.)
+- How this specific book's themes fit genre expectations
 
-STEP 2 - STUDY STYLE REFERENCES:
+STEP 2 - STUDY GENRE-BASED ARTISTIC EXAMPLES:
 {example_prompts}
 
-STEP 3 - CREATE 6 GENRE-PERFECT PROMPTS:
-Based on your research, create exactly 6 genre-perfect thumbnails.
+STEP 3 - CREATE 6 GENRE-AUTHENTIC ARTISTIC PROMPTS:
+Based on your research, create exactly 6 thumbnails combining 3-5 genre elements in period-appropriate illustrated styles.
 
-Requirements for each prompt:
-- Use symbols, colors, and imagery that fans of this book's genre expect
-- Include familiar genre elements but with fresh twists specific to this book
-- Capture the precise emotional tone of this specific story
-- Include details that dedicated readers of this genre will appreciate
-- Remain welcoming to newcomers to the genre
-- Meet current design expectations for this book's genre
-- Professional typography: "{author}" in [genre-appropriate font], "{book_title}" in [genre-matching style], "Narrated by {narrated_by}" in [professional standard]
+CRITICAL REQUIREMENTS for each prompt:
+- COMBINE 3-5 genre-specific visual elements in ONE illustrated composition
+- SPECIFY artistic style matching genre traditions: noir graphic novel, art nouveau, vintage pulp, gothic illustration, etc. - NO photorealism
+- USE genre-appropriate color palette with bold contrast for YouTube visibility
+- LAYER iconic genre symbols, character archetypes, and atmospheric elements
+- INTEGRATE typography in genre-matching style: "{author}" in [genre-authentic artistic font], "{book_title}" in [bold genre-appropriate display font], "Narrated by {narrated_by}" in [professional readable style]
+- BALANCE familiar genre elements with fresh book-specific details
+- ENSURE mobile clarity while maintaining genre atmosphere
 {part_instruction}
 
 IMPORTANT OUTPUT FORMAT:
-- Each prompt starts with: "Create a cinematic audiobook thumbnail for..."
+- Each prompt starts with: "Create an illustrated audiobook thumbnail for..." or "Create an artistic audiobook thumbnail for..."
 - Do NOT use numbered lists, markdown headers, or separators
 - Generate 6 complete, standalone prompts
 - Each prompt should be a single paragraph
 - No "Prompt 1:", "###", or numbering
 
-Generate exactly 6 genre-authentic prompts based on your research that will satisfy both fans and newcomers."""
+Generate exactly 6 genre-authentic multi-element illustrated prompts that combine familiar conventions with book-specific artistic flair."""
     }
 }
 
 
 def create_agent_council(
-    model_profile: str = 'balanced', 
+    model_profile: str = 'balanced',
     temperature: float = DEFAULT_TEMPERATURE,
     verbose: bool = False
 ) -> Dict[str, Any]:
     """Create the council of specialized agents using different models for diversity."""
-    
+
+    # Validate that required packages are installed
+    validate_model_packages()
+
     agents = {}
-    
+
     # Get model assignments based on profile
     if model_profile in MODEL_PROFILES:
         model_assignments = MODEL_PROFILES[model_profile]
     else:
         # Use balanced profile as default
         model_assignments = MODEL_PROFILES['balanced']
-    
+
     if verbose:
         print(f"  🤖 Creating agent council with '{model_profile}' model profile:")
     
@@ -771,19 +813,20 @@ def advanced_voting_system(
         # Format candidates for evaluation
         candidates_text = "\n\n".join([f"CANDIDATE #{i+1}:\n{prompt}" for i, prompt in enumerate(all_candidates)])
         
-        evaluation_prompt = f"""You are an expert thumbnail evaluator for "{book_title}" by {author}.
+        evaluation_prompt = f"""You are an expert YouTube thumbnail evaluator for "{book_title}" by {author} audiobook thumbnails.
 
-EVALUATION CRITERIA (with weights):
-1. **Cinematic Quality (30%)** - Visual sophistication, composition, lighting techniques
-2. **Story Relevance (25%)** - Accuracy to "{book_title}" themes and content  
-3. **YouTube Performance (20%)** - Click-worthy design, mobile optimization, attention-grabbing
-4. **Professional Polish (15%)** - Typography quality, production value, overall finish
-5. **Genre Authenticity (10%)** - Appropriate for the book's genre and themes
+EVALUATION CRITERIA (optimized for YouTube success):
+1. **Visual Impact & Attention-Grabbing (25%)** - Bold colors, high contrast, thumb-stopping power, stands out in feeds
+2. **Artistic Style & Creativity (20%)** - Illustrated/artistic approach, avoids photorealism, unique aesthetic, creative composition
+3. **Multi-Scene Storytelling (20%)** - Combines 3-5 iconic elements, layered composition, tells story at a glance, multiple visual hooks
+4. **Typography & Text Design (15%)** - Creative font integration, bold readable text, typography as design element, visual hierarchy
+5. **Thumbnail Clarity at Small Size (10%)** - Works at mobile thumbnail size (320px), clear focal points, readable text, high contrast
+6. **Brand Consistency (10%)** - Professional audiobook aesthetic, trustworthy presentation, genre-appropriate quality
 
 CANDIDATES TO EVALUATE:
 {candidates_text}
 
-**TASK**: Evaluate each candidate and return the TOP 5 with detailed scoring.
+**TASK**: Evaluate each candidate and return the TOP 5 with detailed scoring based on YouTube thumbnail optimization.
 
 **REQUIRED OUTPUT FORMAT** (JSON only, no other text):
 [
@@ -793,13 +836,14 @@ CANDIDATES TO EVALUATE:
     "prompt": "exact candidate text...",
     "total_score": 95,
     "scores": {{
-      "cinematic_quality": 28,
-      "story_relevance": 24,
-      "youtube_performance": 19,
-      "professional_polish": 15,
-      "genre_authenticity": 9
+      "visual_impact": 24,
+      "artistic_style": 19,
+      "multi_scene_storytelling": 19,
+      "typography_design": 14,
+      "thumbnail_clarity": 10,
+      "brand_consistency": 9
     }},
-    "selection_reason": "detailed explanation of why this ranks #1",
+    "selection_reason": "detailed explanation of why this ranks #1 for YouTube performance",
     "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"]
   }},
   {{
@@ -808,13 +852,14 @@ CANDIDATES TO EVALUATE:
     "prompt": "exact candidate text...",
     "total_score": 88,
     "scores": {{
-      "cinematic_quality": 26,
-      "story_relevance": 22,
-      "youtube_performance": 18,
-      "professional_polish": 13,
-      "genre_authenticity": 9
+      "visual_impact": 22,
+      "artistic_style": 18,
+      "multi_scene_storytelling": 18,
+      "typography_design": 13,
+      "thumbnail_clarity": 9,
+      "brand_consistency": 8
     }},
-    "selection_reason": "detailed explanation of why this ranks #2",
+    "selection_reason": "detailed explanation of why this ranks #2 for YouTube performance",
     "strengths": ["specific strength 1", "specific strength 2"]
   }},
   {{
@@ -823,13 +868,14 @@ CANDIDATES TO EVALUATE:
     "prompt": "exact candidate text...",
     "total_score": 85,
     "scores": {{
-      "cinematic_quality": 25,
-      "story_relevance": 21,
-      "youtube_performance": 17,
-      "professional_polish": 13,
-      "genre_authenticity": 9
+      "visual_impact": 21,
+      "artistic_style": 17,
+      "multi_scene_storytelling": 17,
+      "typography_design": 13,
+      "thumbnail_clarity": 9,
+      "brand_consistency": 8
     }},
-    "selection_reason": "detailed explanation of why this ranks #3",
+    "selection_reason": "detailed explanation of why this ranks #3 for YouTube performance",
     "strengths": ["specific strength 1", "specific strength 2"]
   }},
   {{
@@ -838,13 +884,14 @@ CANDIDATES TO EVALUATE:
     "prompt": "exact candidate text...",
     "total_score": 82,
     "scores": {{
-      "cinematic_quality": 24,
-      "story_relevance": 20,
-      "youtube_performance": 16,
-      "professional_polish": 12,
-      "genre_authenticity": 10
+      "visual_impact": 20,
+      "artistic_style": 16,
+      "multi_scene_storytelling": 16,
+      "typography_design": 12,
+      "thumbnail_clarity": 9,
+      "brand_consistency": 9
     }},
-    "selection_reason": "detailed explanation of why this ranks #4",
+    "selection_reason": "detailed explanation of why this ranks #4 for YouTube performance",
     "strengths": ["specific strength 1"]
   }},
   {{
@@ -853,13 +900,14 @@ CANDIDATES TO EVALUATE:
     "prompt": "exact candidate text...",
     "total_score": 78,
     "scores": {{
-      "cinematic_quality": 23,
-      "story_relevance": 19,
-      "youtube_performance": 15,
-      "professional_polish": 11,
-      "genre_authenticity": 10
+      "visual_impact": 19,
+      "artistic_style": 15,
+      "multi_scene_storytelling": 15,
+      "typography_design": 12,
+      "thumbnail_clarity": 9,
+      "brand_consistency": 8
     }},
-    "selection_reason": "detailed explanation of why this ranks #5",
+    "selection_reason": "detailed explanation of why this ranks #5 for YouTube performance",
     "strengths": ["specific strength 1"]
   }}
 ]
@@ -887,11 +935,12 @@ Return ONLY the JSON array above. No additional text."""
                 'evaluation_model': model,
                 'total_candidates': len(all_candidates),
                 'evaluation_criteria': {
-                    'cinematic_quality': '30%',
-                    'story_relevance': '25%', 
-                    'youtube_performance': '20%',
-                    'professional_polish': '15%',
-                    'genre_authenticity': '10%'
+                    'visual_impact': '25%',
+                    'artistic_style': '20%',
+                    'multi_scene_storytelling': '20%',
+                    'typography_design': '15%',
+                    'thumbnail_clarity': '10%',
+                    'brand_consistency': '10%'
                 },
                 'selected_prompts': [],
                 'voting_timestamp': datetime.now().isoformat()
@@ -1227,9 +1276,10 @@ def generate_image_prompts_internal(
                 print(f"📊 SCORE: {selection_info.get('total_score', 'N/A')}/100")
                 if 'detailed_scores' in selection_info:
                     scores = selection_info['detailed_scores']
-                    print(f"   • Cinematic Quality: {scores.get('cinematic_quality', 'N/A')}/30")
-                    print(f"   • Story Relevance: {scores.get('story_relevance', 'N/A')}/25")
-                    print(f"   • YouTube Performance: {scores.get('youtube_performance', 'N/A')}/20")
+                    print(f"   • Visual Impact: {scores.get('visual_impact', 'N/A')}/25")
+                    print(f"   • Artistic Style: {scores.get('artistic_style', 'N/A')}/20")
+                    print(f"   • Multi-Scene Storytelling: {scores.get('multi_scene_storytelling', 'N/A')}/20")
+                    print(f"   • Typography Design: {scores.get('typography_design', 'N/A')}/15")
                 print(f"💡 REASON: {selection_info.get('selection_reason', 'No reason provided')}")
                 if 'strengths' in selection_info:
                     print(f"💪 STRENGTHS: {', '.join(selection_info['strengths'])}")
@@ -1657,36 +1707,40 @@ def generate_image_prompts_from_foundry(
 
 
 def main():
-    """Test the enhanced system"""
+    """Test the enhanced system using production foundry workflow"""
     print("🎬 ENHANCED AUDIOBOOK THUMBNAIL GENERATOR - MULTI-MODEL AGENT COUNCIL")
     print("=" * 70)
-    
-    # Simple test with A Tale of Two Cities
-    book_id = "pg98"
-    book_title = "A Tale of Two Cities"
-    author = "Charles Dickens"
-    narrator = "Rowan Whitmore"
-    
-    print(f"📚 Testing: {book_title} by {author} (ID: {book_id})")
-    
-    # Test the FULL pipeline function that actually updates metadata.json
-    print(f"\n🧪 Testing FULL pipeline integration (updates metadata.json):")
-    metadata_path = f"foundry/processing/{book_id}/metadata.json"
-    
-    result = generate_image_prompts_for_book(
+
+    # Test with real book from foundry structure
+    book_id = "pg1064"  # Use existing book in foundry
+    language = "eng"
+
+    # Mock audiobook_dict matching production structure
+    audiobook_dict = {
+        'book_id': book_id,
+        'book_name': 'A Christmas Carol',
+        'author': 'Charles Dickens',
+        'narrator_name': 'LibriVox Community',
+        'language': language
+    }
+
+    print(f"📚 Testing: {audiobook_dict['book_name']} by {audiobook_dict['author']} (ID: {book_id})")
+    print(f"🔍 Using production workflow: foundry/{book_id}/{language}/combination_plan.json")
+
+    # Test using the ACTUAL production function that audiobook_cli.py uses
+    print(f"\n🧪 Testing production workflow (generate_image_prompts_from_foundry):")
+
+    result = generate_image_prompts_from_foundry(
         book_id=book_id,
-        book_title=book_title,
-        author=author,
-        narrated_by=narrator,
-        metadata_file_path=metadata_path,
+        language=language,
+        audiobook_dict=audiobook_dict,
         model_profile='balanced',
-        temperature=DEFAULT_TEMPERATURE,
         verbose=True
     )
-    
-    if result['success']:
-        print(f"\n✅ SUCCESS: metadata.json should now be updated!")
-        print(f"📁 Updated file: {metadata_path}")
+
+    if result.get('success', False):
+        print(f"\n✅ SUCCESS: Image prompts generated using production workflow!")
+        print(f"📁 Output location: foundry/{book_id}/{language}/image_prompts/")
         print(f"📊 Analysis file: foundry/processing/{book_id}/prompt_analysis_[timestamp].json")
         return True
     else:

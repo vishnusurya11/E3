@@ -841,38 +841,50 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
         # Find the chapter div that contains this anchor
         chapter_div = anchor.find_parent('div', class_='chapter')
         if chapter_div:
-            # For Tom Sawyer style: paragraphs are AFTER the chapter div, not inside
-            # Start collecting from the chapter div and look for paragraphs that follow
-            current = chapter_div.find_next_sibling()
-            
-            while current:
-                # Stop if we hit the next chapter
-                if (current.name == 'div' and current.get('class') == ['chapter']) or \
-                   (current.name in ['h1', 'h2'] and 'CHAPTER' in current.get_text().upper()):
-                    break
-                    
-                # Skip image divs
-                if current.name == 'div' and current.get('class') == ['fig']:
-                    current = current.find_next_sibling()
-                    continue
-                
-                # Collect paragraph content
-                if current.name == 'p':
-                    text = current.get_text(separator=' ', strip=True)
+            # Check if paragraphs are inside or after the chapter div
+            # First try to find paragraphs INSIDE the chapter div (pg174 style)
+            inside_paragraphs = chapter_div.find_all('p')
+
+            if inside_paragraphs:
+                # pg174 style: paragraphs are INSIDE the chapter div
+                for p in inside_paragraphs:
+                    text = p.get_text(separator=' ', strip=True)
                     if text:
                         cleaned = clean_text(text)
                         if cleaned:
                             paragraphs.append(cleaned)
-                elif current.name == 'div':
-                    # Check for paragraphs inside divs
-                    for p in current.find_all('p'):
-                        text = p.get_text(separator=' ', strip=True)
+            else:
+                # Tom Sawyer style: paragraphs are AFTER the chapter div
+                current = chapter_div.find_next_sibling()
+
+                while current:
+                    # Stop if we hit the next chapter
+                    if (current.name == 'div' and current.get('class') == ['chapter']) or \
+                       (current.name in ['h1', 'h2'] and 'CHAPTER' in current.get_text().upper()):
+                        break
+
+                    # Skip image divs
+                    if current.name == 'div' and current.get('class') == ['fig']:
+                        current = current.find_next_sibling()
+                        continue
+
+                    # Collect paragraph content
+                    if current.name == 'p':
+                        text = current.get_text(separator=' ', strip=True)
                         if text:
                             cleaned = clean_text(text)
                             if cleaned:
                                 paragraphs.append(cleaned)
-                
-                current = current.find_next_sibling()
+                    elif current.name == 'div':
+                        # Check for paragraphs inside divs
+                        for p in current.find_all('p'):
+                            text = p.get_text(separator=' ', strip=True)
+                            if text:
+                                cleaned = clean_text(text)
+                                if cleaned:
+                                    paragraphs.append(cleaned)
+
+                    current = current.find_next_sibling()
         else:
             # Fallback: collect paragraphs after heading until next chapter
             if anchor.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
@@ -889,25 +901,56 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
                         headings_to_skip -= 1
             else:
                 # anchor might be inside heading, start from parent's next sibling
-                current = anchor.parent
-                if current and current.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                    current = current.find_next_sibling()
-            
-            while current:
-                # Stop if we hit the next chapter heading with CH id
-                if (next_anchor and current.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and 
-                    current.get('id') == next_anchor.get('id')):
-                    break
-                
+                parent = anchor.parent
+                print(f"    Anchor parent: {parent.name if parent else 'None'}")
+
+                if parent and parent.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                    # For pg174 style: <h2><a id="chap00"></a>THE PREFACE</h2>
+                    # We need to start from the heading's next sibling
+                    current = parent.find_next_sibling()
+                    print(f"    Starting from heading's next sibling: {current.name if current else 'None'}")
+                else:
+                    # If anchor.parent is not a heading, start from anchor itself
+                    current = anchor.find_next_sibling()
+                    print(f"    Starting from anchor's next sibling: {current.name if current else 'None'}")
+
+            # Debug: Track paragraph collection
+            paragraph_count = 0
+            elements_checked = 0
+            max_elements = 100  # Safety limit
+
+            print(f"    Starting content extraction for chapter {chapter_index}: {title}")
+            print(f"    Current element after setup: {current.name if current else 'None'}")
+
+            while current and elements_checked < max_elements:
+                elements_checked += 1
+
+                # Debug current element
+                if elements_checked <= 5:  # Log first 5 elements
+                    print(f"    Element {elements_checked}: {current.name}, class={current.get('class', [])}")
+
+                # Stop if we hit the next chapter anchor
+                if next_anchor:
+                    # Check if current element contains the next anchor
+                    if (current.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and
+                        current.find('a', id=next_anchor.get('id'))):
+                        print(f"    Stopping: Found next chapter anchor in {current.name}")
+                        break
+                    # Also stop if current has the next anchor's ID
+                    if current.get('id') == next_anchor.get('id'):
+                        print(f"    Stopping: Current element has next anchor ID")
+                        break
+
                 # Stop if we hit another chapter div
                 if current.name == 'div' and 'chapter' in current.get('class', []):
+                    print(f"    Stopping: Found chapter div")
                     break
-                
+
                 # Skip div.chtitle (chapter title div) - we already processed it
                 if current.name == 'div' and 'chtitle' in current.get('class', []):
                     current = current.find_next_sibling()
                     continue
-                
+
                 # Collect paragraphs
                 if current.name == 'p':
                     text = current.get_text(separator=' ', strip=True)
@@ -915,23 +958,33 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
                         cleaned = clean_text(text)
                         if cleaned:
                             paragraphs.append(cleaned)
+                            paragraph_count += 1
+                            if paragraph_count <= 2:  # Log first 2 paragraphs
+                                print(f"    Found paragraph {paragraph_count}: {cleaned[:100]}...")
                 elif current.name == 'div':
-                    for p in current.find_all('p'):
+                    div_paras = current.find_all('p')
+                    for p in div_paras:
                         text = p.get_text(separator=' ', strip=True)
                         if text:
                             cleaned = clean_text(text)
                             if cleaned:
                                 paragraphs.append(cleaned)
-                
+                                paragraph_count += 1
+                                if paragraph_count <= 2:
+                                    print(f"    Found paragraph {paragraph_count} in div: {cleaned[:100]}...")
+
                 current = current.find_next_sibling()
-                
+
                 if not current:
                     break
         
         # If no paragraphs found, use title as content
         if not paragraphs:
+            print(f"    WARNING: No paragraphs found for chapter {chapter_index}: {title}")
             paragraphs = [f"[{title}]"]
-        
+        else:
+            print(f"    Total paragraphs found: {len(paragraphs)}")
+
         chapters.append({
             'index': chapter_index,
             'title': title,
@@ -1054,19 +1107,19 @@ def parse_gutenberg_html_tts(
         strategy_used = 'anchor'
     
     # Strategy 2: Try div-based extraction
-    if not chapters:
+    if not strategy_used:  # Changed from 'if not chapters'
         chapters = extract_chapters_strategy_div(soup)
         if chapters and any(len(ch.get('paragraphs', [])) > 0 for ch in chapters):
             strategy_used = 'div'
-    
+
     # Strategy 3: Try h2 sequential
-    if not chapters:
+    if not strategy_used:  # Changed from 'if not chapters'
         chapters = extract_chapters_strategy_h2_sequential(soup)
         if chapters and any(len(ch.get('paragraphs', [])) > 0 for ch in chapters):
             strategy_used = 'h2_sequential'
-    
+
     # Strategy 4: Try heading hierarchy
-    if not chapters:
+    if not strategy_used:  # Changed from 'if not chapters'
         chapters = extract_chapters_strategy_heading_hierarchy(soup)
         if chapters and any(len(ch.get('paragraphs', [])) > 0 for ch in chapters):
             strategy_used = 'heading_hierarchy'

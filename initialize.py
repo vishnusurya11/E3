@@ -127,6 +127,35 @@ def create_database_schema(db_path: str) -> None:
                 FOREIGN KEY (audiobook_id) REFERENCES audiobook_productions(audiobook_id)
             )
         """)
+
+        # Create gutenberg_books table (Project Gutenberg Catalog with JSON support)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gutenberg_books (
+                id INTEGER PRIMARY KEY,                    -- Project Gutenberg book ID (1342, 74, etc.)
+                title TEXT NOT NULL,                       -- "Pride and Prejudice"
+                raw_metadata JSON,                         -- Complete original JSON from catalog
+
+                -- Extracted fields for fast queries (generated columns with STORED for performance)
+                download_count INTEGER GENERATED ALWAYS AS (json_extract(raw_metadata, '$.download_count')) STORED,
+                primary_author TEXT GENERATED ALWAYS AS (json_extract(raw_metadata, '$.authors[0].name')) STORED,
+                language TEXT GENERATED ALWAYS AS (json_extract(raw_metadata, '$.languages[0]')) STORED,
+
+                -- Timestamps for tracking
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_version TEXT DEFAULT 'v1'             -- Track weekly updates
+            )
+        """)
+
+        # Create gutenberg_process_events table (Gutenberg CLI Pipeline Tracker)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gutenberg_process_events (
+                timestamp TIMESTAMP NOT NULL,
+                step_name VARCHAR(100) NOT NULL,
+                status TEXT CHECK(status IN ('pending','processing','failed','success')) NOT NULL,
+                PRIMARY KEY (timestamp, step_name)
+            )
+        """)
         
         # Create performance indices
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_books_book_id ON books(book_id)")
@@ -138,6 +167,16 @@ def create_database_schema(db_path: str) -> None:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_audiobook_id ON audiobook_process_events(audiobook_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_comfyui_jobs_status_priority ON comfyui_jobs(status, priority)")
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_comfyui_jobs_config_name ON comfyui_jobs(config_name)")
+
+        # Create gutenberg_books performance indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gutenberg_author ON gutenberg_books(primary_author)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gutenberg_language ON gutenberg_books(language)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gutenberg_downloads ON gutenberg_books(download_count DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gutenberg_title ON gutenberg_books(title)")
+
+        # Create gutenberg_process_events performance indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gutenberg_events_step ON gutenberg_process_events(step_name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_gutenberg_events_status ON gutenberg_process_events(status)")
         
         conn.commit()
 
@@ -174,6 +213,15 @@ def validate_database_schema(db_path: str) -> bool:
     
     expected_audiobook_process_events_columns = {
         'audiobook_id', 'timestamp', 'step_number', 'status'
+    }
+
+    expected_gutenberg_books_columns = {
+        'id', 'title', 'raw_metadata', 'download_count', 'primary_author',
+        'language', 'created_at', 'updated_at', 'data_version'
+    }
+
+    expected_gutenberg_process_events_columns = {
+        'timestamp', 'step_name', 'status'
     }
     
     try:
@@ -254,7 +302,37 @@ def validate_database_schema(db_path: str) -> bool:
                 print(f"⚠️  Extra columns in audiobook_process_events table: {extra}")
                 
             print(f"✅ Audiobook process events table validated - {len(events_columns)} columns present")
-            
+
+            # Validate gutenberg_books table (use table_xinfo to see generated columns)
+            cursor.execute("PRAGMA table_xinfo(gutenberg_books)")
+            gutenberg_columns = {row[1] for row in cursor.fetchall()}
+
+            missing = expected_gutenberg_books_columns - gutenberg_columns
+            if missing:
+                print(f"❌ Missing columns in gutenberg_books table: {missing}")
+                return False
+
+            extra = gutenberg_columns - expected_gutenberg_books_columns
+            if extra:
+                print(f"⚠️  Extra columns in gutenberg_books table: {extra}")
+
+            print(f"✅ Gutenberg books table validated - {len(gutenberg_columns)} columns present")
+
+            # Validate gutenberg_process_events table
+            cursor.execute("PRAGMA table_info(gutenberg_process_events)")
+            gutenberg_events_columns = {row[1] for row in cursor.fetchall()}
+
+            missing = expected_gutenberg_process_events_columns - gutenberg_events_columns
+            if missing:
+                print(f"❌ Missing columns in gutenberg_process_events table: {missing}")
+                return False
+
+            extra = gutenberg_events_columns - expected_gutenberg_process_events_columns
+            if extra:
+                print(f"⚠️  Extra columns in gutenberg_process_events table: {extra}")
+
+            print(f"✅ Gutenberg process events table validated - {len(gutenberg_events_columns)} columns present")
+
             # Check WAL mode
             cursor.execute("PRAGMA journal_mode")
             journal_mode = cursor.fetchone()[0]

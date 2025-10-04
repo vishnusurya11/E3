@@ -25,10 +25,15 @@ dependencies = [
     # AI/LLM dependencies
     "langchain>=0.0.350",
     "langchain-openai>=0.0.5",
+    "langchain-community>=0.0.10",
     
     # Image processing
     "Pillow>=10.0.0",
-    
+
+    # Neo4j Graph Database
+    "neo4j>=5.0.0",
+    "py2neo>=2021.2.0",
+
     # YouTube API
     "google-api-python-client>=2.0.0",
     "google-auth-oauthlib>=1.0.0", 
@@ -38,6 +43,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "beautifulsoup4>=4.12.0",
     "pydub>=0.25.0",
+    "pytz>=2023.3",
     
     # CLI
     "typer>=0.9.0",

@@ -1,0 +1,49 @@
+Project Gutenberg Catalog Summary
+Generated: 2025-09-20 17:11:12
+
+CATALOG STATISTICS:
+==================
+Total Books: 76,726
+Total Downloads: 29,874,297
+Unique Languages: 70
+Unique Subjects: 41,504
+Unique Bookshelves: 414
+
+PROCESSING STATISTICS:
+=====================
+Total RDF Files: 76,726
+Successfully Parsed: 76,726
+Failed to Parse: 0
+Success Rate: 100.0%
+
+TIMING:
+=======
+Start Time: 2025-09-20 16:53:27.864362
+End Time: None
+Duration: Unknown
+
+TOP LANGUAGES:
+==============
+en: 61,147 books
+fr: 4,017 books
+fi: 3,434 books
+de: 2,365 books
+it: 1,079 books
+nl: 1,069 books
+es: 893 books
+pt: 647 books
+hu: 620 books
+zh: 444 books
+
+TOP FORMATS:
+============
+application/rdf+xml: 76,651 books
+image/jpeg: 76,570 books
+text/plain; charset=us-ascii: 76,398 books
+text/html: 76,252 books
+application/octet-stream: 76,139 books
+application/x-mobipocket-ebook: 75,274 books
+application/epub+zip: 75,273 books
+application/pdf: 1,301 books
+audio/mpeg: 1,124 books
+text/plain; charset=utf-8: 878 books

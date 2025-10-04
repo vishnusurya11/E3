@@ -20,6 +20,10 @@ Pillow>=10.0.0
 # Database (using stdlib sqlite3, but adding sqlalchemy for ORM if needed)
 # sqlalchemy>=2.0.0  # Optional - uncomment if using ORM
 
+# Neo4j Graph Database
+neo4j>=5.0.0
+py2neo>=2021.2.0
+
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
@@ -40,6 +44,7 @@ rich>=13.5.0  # For better CLI output
 python-dotenv>=1.0.0  # For .env file support
 beautifulsoup4>=4.12.0  # For HTML parsing
 pydub>=0.25.0  # For audio processing and combining
+pytz>=2023.3  # For timezone handling in gutenberg_cli.py
 
 # YouTube API
 google-api-python-client>=2.0.0  # YouTube Data API v3
