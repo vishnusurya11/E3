@@ -110,7 +110,7 @@ def check_image_jobs_completion(
             expected_images = len(part_data.get('prompts', []))
             
             # ComfyUI output directory (dynamic per book/part)
-            output_dir = Path(f"D:\\Projects\\pheonix\\dev\\output\\images\\{book_id}\\part{part_number}")
+            output_dir = Path(rf"D:\Projects\KingdomOfViSuReNa\alpha\ComfyUI_windows_portable\ComfyUI\output\images\{book_id}\part{part_number}")
             
             if output_dir.exists():
                 # Count actual image files

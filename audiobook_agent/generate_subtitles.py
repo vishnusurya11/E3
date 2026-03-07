@@ -12,7 +12,7 @@ import re
 
 # Configuration
 BOOK_ID = 'pg61262'  # Change this for different books
-AUDIO_PATH = rf"D:\Projects\pheonix\dev\output\speech\{BOOK_ID}"
+AUDIO_PATH = rf"D:\Projects\KingdomOfViSuReNa\alpha\ComfyUI_windows_portable\ComfyUI\output\speech\{BOOK_ID}"
 TEXT_PATH = rf"output\{BOOK_ID}-images"
 OUTPUT_PATH = rf"subtitles\{BOOK_ID}"
 

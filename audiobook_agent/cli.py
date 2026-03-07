@@ -29,6 +29,22 @@ from .create_tts_audio_jobs import create_tts_jobs
 from .audiobook_helper import get_all_books, get_processable_books, update_book_record, log_simple, mark_stage_completed, mark_stage_failed
 
 
+def _parse_with_langchain(input_file: str, verbose: bool = True) -> dict:
+    """Wrap parse_book_with_agents — saves codex.json + chapters/ into the foundry book dir."""
+    from .parse_novel_langchain import parse_book_with_agents, save_as_codex
+    result = parse_book_with_agents(input_file, verbose=verbose)
+    save_as_codex(result, input_file)
+    total_words = sum(ch["word_count"] for ch in result["chapters"])
+    total_chunks = sum(ch.get("paragraph_count", len(ch.get("paragraphs", [])))
+                       for ch in result["chapters"])
+    return {
+        "success": True,
+        "total_chapters_all_books": result["total_chapters"],
+        "total_chunks_all_books": total_chunks,
+        "total_words_all_books": total_words,
+    }
+
+
 ################################################################################
 # STEP 1: GET DATA FROM DATABASE  
 ################################################################################
@@ -55,9 +71,13 @@ def get_books_from_db() -> List[Dict]:
 # STEP 2: PARSE ONE RECORD
 ################################################################################
 
-def parse_one_book(book_record: Dict, output_dir: str) -> bool:
-    """Parse the selected book record and update database."""
-    print(f"\nSTEP 2: Parsing book record...")
+def parse_one_book(book_record: Dict, output_dir: str, parser: str = "legacy") -> bool:
+    """Parse the selected book record and update database.
+
+    Args:
+        parser: 'legacy' (default, uses parse_novel_tts.py) or 'langchain' (AI agents)
+    """
+    print(f"\nSTEP 2: Parsing book record... [parser={parser}]")
     
     book_id = book_record['book_id']
     book_title = book_record['book_title']
@@ -73,13 +93,16 @@ def parse_one_book(book_record: Dict, output_dir: str) -> bool:
     log_simple(book_id, f"Started parsing '{book_title}'", 'INFO', 'parse_start')
     
     try:
-        print("Running parse_novel...")
-        
-        result = parse_novel(
-            input_file=input_file,
-            output_dir=output_dir,
-            verbose=True
-        )
+        if parser == "langchain":
+            print("Running LangChain multi-agent parser...")
+            result = _parse_with_langchain(input_file, verbose=True)
+        else:
+            print("Running parse_novel (legacy)...")
+            result = parse_novel(
+                input_file=input_file,
+                output_dir=output_dir,
+                verbose=True,
+            )
         
         if result['success']:
             # Update dict with completion
@@ -135,9 +158,12 @@ def generate_audio_jobs_for_book(book_dict: Dict, processing_dir: str) -> bool:
         log_simple(book_id, f"No narrator_audio configured for book", 'ERROR', 'audio_jobs_failed')
         return False
     
-    # Input: foundry/processing/pg1155/
-    book_folder = Path(processing_dir) / book_id
-    
+    # Input: foundry/{book_id}/chapters/ (codex pipeline)
+    # Falls back to processing_dir/{book_id}/ for legacy-parsed books
+    book_folder = Path("foundry") / book_id / "chapters"
+    if not book_folder.exists():
+        book_folder = Path(processing_dir) / book_id
+
     print(f"Book folder: {book_folder}")
     print(f"Narrator audio: {narrator_audio}")
     
@@ -186,6 +212,55 @@ def generate_audio_jobs_for_book(book_dict: Dict, processing_dir: str) -> bool:
         update_book_record(book_dict)
         log_simple(book_id, f"Audio job creation error: {e}", 'ERROR', 'audio_jobs_error')
         print(f"Audio job creation error: {e}")
+        return False
+
+
+################################################################################
+# STEP 4b: ENTITY EXTRACTION (scenes, characters, locations)
+################################################################################
+
+def analyze_entities_for_book(
+    book_dict: Dict,
+    model: str = "google/gemini-2.0-flash-lite-001",
+    verbose: bool = True,
+    resume: bool = True,
+) -> bool:
+    """Extract scenes, characters, and locations from chapter files into foundry."""
+    print(f"\nSTEP 4b: Extracting entities (scenes / characters / locations)...")
+
+    from .analyze_entities import analyze_book_entities
+
+    book_id = book_dict["book_id"]
+    book_dir = Path("foundry") / book_id
+
+    if not book_dir.exists():
+        print(f"Foundry directory not found: {book_dir}")
+        log_simple(book_id, f"Foundry dir not found: {book_dir}", "ERROR", "entity_analysis_failed")
+        return False
+
+    try:
+        result = analyze_book_entities(book_dir, model=model, verbose=verbose, resume=resume)
+        if result["success"]:
+            book_dict = mark_stage_completed(book_dict, "entity_analysis")
+            update_book_record(book_dict)
+            log_simple(
+                book_id,
+                f"Entities extracted: {result['characters']} characters, "
+                f"{result['locations']} locations, {result['chapters_analyzed']} chapters",
+                "INFO", "entity_analysis_complete",
+            )
+            print(f"Entities extracted: {result['characters']} characters, "
+                  f"{result['locations']} locations")
+            return True
+        else:
+            book_dict = mark_stage_failed(book_dict, "entity_analysis")
+            update_book_record(book_dict)
+            return False
+    except Exception as e:
+        book_dict = mark_stage_failed(book_dict, "entity_analysis")
+        update_book_record(book_dict)
+        log_simple(book_id, f"Entity analysis error: {e}", "ERROR", "entity_analysis_error")
+        print(f"Entity analysis error: {e}")
         return False
 
 
@@ -312,7 +387,7 @@ def move_audio_files_for_book(book_dict: Dict) -> bool:
     print(f"✅ SAFETY CHECK PASSED: All {completed_jobs} jobs completed")
     
     # Source: dev/output/speech/{book_id}/
-    source_dir = Path("D:/Projects/pheonix/dev/output/speech") / book_id
+    source_dir = Path("D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/speech") / book_id
     
     # Destination: foundry/processing/{book_id}/speech/
     dest_dir = Path("foundry/processing") / book_id / "speech"
@@ -1058,7 +1133,7 @@ def generate_videos_for_book_pipeline(book_dict: Dict) -> bool:
     
     # PRE-VALIDATION: Verify images actually exist before starting video generation
     clean_book_id = book_id.replace('-images', '')
-    images_base_dir = f"D:\\Projects\\pheonix\\dev\\output\\images\\{book_id}"
+    images_base_dir = rf"D:\Projects\KingdomOfViSuReNa\alpha\ComfyUI_windows_portable\ComfyUI\output\images\{book_id}"
     
     if not os.path.exists(images_base_dir):
         print(f"❌ VALIDATION: Images directory not found: {images_base_dir}")

@@ -739,7 +739,7 @@ def move_comfyui_audio_files(book_id: str, language: str = 'eng') -> bool:
     """
     Move completed ComfyUI audio folder structure from dev output to foundry speech directory.
     
-    Copies entire folder structure from D:/Projects/pheonix/dev/output/speech/alpha/{book_id}/
+    Copies entire folder structure from D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/speech/alpha/{book_id}/
     to foundry/{book_id}/{language}/speech/ preserving ch001/chunk001/audio_*.flac structure
     
     Args:
@@ -754,7 +754,7 @@ def move_comfyui_audio_files(book_id: str, language: str = 'eng') -> bool:
     from pathlib import Path
     
     # Source directory - ComfyUI output with chapter/chunk structure
-    source_dir = f"D:/Projects/pheonix/dev/output/speech/alpha/{book_id}"
+    source_dir = f"D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/speech/alpha/{book_id}"
     
     # Destination directory 
     dest_dir = f"foundry/{book_id}/{language}/speech"
@@ -808,7 +808,7 @@ def move_comfyui_image_files(book_id: str, language: str = 'eng') -> bool:
     """
     Move completed ComfyUI image files from dev output to foundry images directory.
     
-    Copies entire folder structure from D:/Projects/pheonix/dev/output/image/alpha/{book_id}/
+    Copies entire folder structure from D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/image/alpha/{book_id}/
     to foundry/{book_id}/{language}/images/ preserving folder structure
     
     Args:
@@ -823,7 +823,7 @@ def move_comfyui_image_files(book_id: str, language: str = 'eng') -> bool:
     from pathlib import Path
     
     # Source directory - ComfyUI image output
-    source_dir = f"D:/Projects/pheonix/dev/output/images/alpha/{book_id}"
+    source_dir = f"D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/images/alpha/{book_id}"
     
     # Destination directory 
     dest_dir = f"foundry/{book_id}/{language}/images"
@@ -1966,14 +1966,18 @@ Whether you're commuting, exercising, or simply relaxing, immerse yourself in th
                     dt_pacific = datetime.strptime(publish_date_str, '%Y%m%d%H%M%S')
                     print(f"   🐛 DEBUG: Parsed successfully: {dt_pacific}")
 
-                    # Convert to UTC format with Z suffix (YouTube API requirement)
-                    youtube_publish_time = dt_pacific.strftime('%Y-%m-%dT%H:%M:%S.000Z')
-                    print(f"   🔍 TRACE: Set youtube_publish_time = '{youtube_publish_time}'")
-
                     # Create Pacific timezone using UTC offset (PST/PDT)
                     # Pacific Standard Time is UTC-8, Pacific Daylight Time is UTC-7
                     # For September, it's PDT (UTC-7)
                     pacific_offset = timedelta(hours=-7)  # PDT offset
+
+                    # Convert Pacific Time to UTC (add 7 hours for PDT)
+                    dt_utc = dt_pacific - pacific_offset
+                    print(f"   🐛 DEBUG: Converted to UTC: {dt_utc}")
+
+                    # Format for YouTube API with Z suffix (YouTube API requirement)
+                    youtube_publish_time = dt_utc.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+                    print(f"   🔍 TRACE: Set youtube_publish_time = '{youtube_publish_time}'")
                     utc_now = datetime.now(timezone.utc)
                     now_pacific = (utc_now + pacific_offset).replace(tzinfo=None)
 

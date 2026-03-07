@@ -367,7 +367,7 @@ Monitor ComfyUI TTS job completion and move generated audio files to foundry dir
 ### Input Requirements
 - Completed STEP3_create_audio_jobs (TTS jobs created)
 - ComfyUI jobs in database with config_name containing book_id
-- ComfyUI output files in D:/Projects/pheonix/dev/output/speech/alpha/{book_id}*
+- ComfyUI output files in D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/speech/alpha/{book_id}*
 
 ### Output Structure
 ```
@@ -616,7 +616,7 @@ Monitor ComfyUI image job completion and move generated images to foundry struct
 ### Input Requirements
 - Completed STEP8_create_image_jobs (ComfyUI image jobs created)
 - ComfyUI jobs in database with config_name matching T2I_{book_id} pattern
-- ComfyUI output files in D:/Projects/pheonix/dev/output/images/alpha/{book_id}/
+- ComfyUI output files in D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/images/alpha/{book_id}/
 
 ### Output Structure
 ```

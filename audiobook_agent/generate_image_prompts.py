@@ -427,8 +427,56 @@ def extract_basic_context(research_results: List[str]) -> str:
     
     if context_parts:
         return "Story " + ", ".join(context_parts) + ", with distinctive narrative elements and visual themes"
-    
+
     return ""
+
+
+def load_book_context_from_chapters(book_id: str, language: str = 'eng', max_chars: int = 1500) -> str:
+    """
+    Load minimal book context from chapter files: chapter titles + first chapter excerpt.
+    This provides AI agents with proof the book exists and key themes/characters.
+
+    Token usage: ~400 tokens (safe for all context windows)
+    """
+    import json
+    from pathlib import Path
+
+    chapters_dir = Path(f"foundry/{book_id}/{language}/chapters")
+    metadata_file = chapters_dir / "metadata.json"
+
+    if not metadata_file.exists():
+        return ""
+
+    try:
+        # Load metadata for chapter titles
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+
+        context_parts = []
+
+        # Part 1: Chapter titles (tiny - ~500 chars max)
+        chapters = metadata.get('chapters', [])[:18]  # Max 18 chapters
+        if chapters:
+            chapter_titles = [f"Ch{ch['index']}: {ch['title']}" for ch in chapters]
+            context_parts.append("BOOK STRUCTURE:\n" + "\n".join(chapter_titles))
+
+        # Part 2: First chapter excerpt (limit ~800 chars)
+        chapter_file = chapters_dir / "chapter_001.json"
+        if chapter_file.exists():
+            with open(chapter_file, 'r', encoding='utf-8') as f:
+                chapter_data = json.load(f)
+                title = chapter_data['chapter']['title']
+                chunks = chapter_data['chapter']['chunks']
+                # Get first 2 chunks only, limit to 800 chars
+                excerpt = ' '.join([c['text'] for c in chunks[:2]])[:800]
+                context_parts.append(f"\nFIRST CHAPTER EXCERPT:\n{title}\n{excerpt}...")
+
+        result = '\n'.join(context_parts)
+        return result[:max_chars]  # Hard limit
+
+    except Exception as e:
+        print(f"   ⚠️  Error loading book context: {e}")
+        return ""
 
 
 # Enhanced Agent Council - Each agent generates 6 prompts for 24 total candidates
@@ -444,8 +492,12 @@ ASSIGNMENT:
 - Platform: YouTube (must work at small thumbnail size)
 {part_info}
 
-STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, research "{book_title}" by {author} to identify:
+STEP 1 - ANALYZE PROVIDED BOOK CONTENT:
+Book: "{book_title}" by {author}
+
+{book_context}
+
+Based on this content, identify:
 - 4-5 most iconic visual moments that define the story
 - Main characters with distinctive visual characteristics
 - Key symbolic objects or props that represent the narrative
@@ -488,8 +540,12 @@ ASSIGNMENT:
 - Goal: Combine multiple story moments in illustrated style
 {part_info}
 
-STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, thoroughly research "{book_title}" by {author} to identify:
+STEP 1 - ANALYZE PROVIDED BOOK CONTENT:
+Book: "{book_title}" by {author}
+
+{book_context}
+
+Based on this content, identify:
 - 4-5 most memorable plot moments that fans recognize instantly
 - Main characters with distinctive visual traits and relationships
 - Symbolic objects, props, or locations central to the plot
@@ -534,8 +590,12 @@ ASSIGNMENT:
 - Goal: Maximum click-through rate at thumbnail size
 {part_info}
 
-STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, research "{book_title}" by {author} to identify:
+STEP 1 - ANALYZE PROVIDED BOOK CONTENT:
+Book: "{book_title}" by {author}
+
+{book_context}
+
+Based on this content, identify:
 - Most emotionally compelling moments that trigger curiosity
 - Visual elements that create instant intrigue or excitement
 - Color themes and psychological associations
@@ -579,8 +639,12 @@ ASSIGNMENT:
 - Goal: Combine genre authenticity with artistic illustration
 {part_info}
 
-STEP 1 - RESEARCH THE BOOK:
-Before creating prompts, research "{book_title}" by {author} to understand:
+STEP 1 - ANALYZE PROVIDED BOOK CONTENT:
+Book: "{book_title}" by {author}
+
+{book_context}
+
+Based on this content, understand:
 - Primary genre and visual conventions (mystery, gothic, adventure, literary, etc.)
 - 3-5 iconic genre symbols or imagery fans expect to see
 - Genre-appropriate color palettes and emotional atmosphere
@@ -755,36 +819,96 @@ def extract_prompts_from_response(response_text: str, verbose: bool = False) -> 
     return final_prompts
 
 
-def validate_prompt_quality(prompt: str, book_title: str, author: str, narrated_by: str, verbose: bool = False) -> bool:
-    """Simplified validation to debug what's failing"""
-    
-    # Basic length check
-    if len(prompt) < 50:
+def validate_prompt_quality(prompt: str, book_title: str = "", author: str = "", narrated_by: str = "", verbose: bool = False) -> tuple:
+    """
+    Enhanced validation to detect garbage prompts, AI refusals, and error messages.
+
+    Returns: (is_valid: bool, issues: list[str])
+    """
+    issues = []
+    prompt_lower = prompt.lower()
+
+    # Check 1: Detect AI refusals (CRITICAL - catches garbage prompts)
+    refusal_phrases = [
+        'i apologize',
+        'i cannot',
+        'cannot generate',
+        'unable to',
+        'verified existing book',
+        'confirm the book',
+        'if you can provide',
+        'provide verified',
+        'i would need',
+        'without accurate',
+        'would you like to',
+        'please provide',
+        'do not have access',
+        'i don\'t have'
+    ]
+
+    for phrase in refusal_phrases:
+        if phrase in prompt_lower:
+            issues.append(f"AI refusal detected: '{phrase}'")
+            if verbose:
+                print(f"          REJECTED: Contains refusal phrase '{phrase}'")
+            break  # One refusal is enough to reject
+
+    # Check 2: Detect multiple questions (error messages often ask questions)
+    question_count = prompt.count('?')
+    if question_count > 1:
+        issues.append(f"Contains {question_count} questions - likely error message")
+        if verbose:
+            print(f"          REJECTED: {question_count} question marks")
+
+    # Check 3: Minimum length
+    min_length = 100
+    if len(prompt) < min_length:
+        issues.append(f"Too short ({len(prompt)} chars, min {min_length})")
         if verbose:
             print(f"          REJECTED: Too short ({len(prompt)} chars)")
-        return False
-    
-    prompt_lower = prompt.lower()
-    
-    # Must start with the right phrase
-    if not prompt_lower.startswith('create a cinematic audiobook thumbnail'):
+
+    # Check 4: Must contain image generation keywords
+    required_keywords = ['cinematic', 'audiobook', 'thumbnail', 'create']
+    has_required = any(keyword in prompt_lower for keyword in required_keywords)
+
+    if not has_required:
+        issues.append("Missing image generation keywords (cinematic/audiobook/thumbnail/create)")
         if verbose:
-            print(f"          REJECTED: Wrong start - {prompt[:50]}...")
-        return False
-    
-    # Must have basic visual language
-    visual_words = ['cinematic', 'featuring', 'showing', 'style', 'design']
-    has_visual_language = any(word in prompt_lower for word in visual_words)
-    
-    if not has_visual_language:
+            print(f"          REJECTED: Missing required keywords")
+
+    # Check 5: Contains error-like patterns
+    error_patterns = ['error', 'failed', 'exception', 'traceback', 'invalid', 'please try again']
+
+    for pattern in error_patterns:
+        if pattern in prompt_lower:
+            issues.append(f"Contains error pattern: '{pattern}'")
+            if verbose:
+                print(f"          REJECTED: Contains error word '{pattern}'")
+            break
+
+    # Check 6: Must describe visual elements
+    visual_keywords = [
+        'color', 'style', 'background', 'foreground', 'character', 'scene',
+        'composition', 'lighting', 'atmosphere', 'illustration', 'art',
+        'featuring', 'showing', 'design', 'palette', 'typography'
+    ]
+
+    visual_count = sum(1 for keyword in visual_keywords if keyword in prompt_lower)
+    if visual_count < 3:
+        issues.append(f"Lacks visual description (only {visual_count}/3+ visual keywords)")
         if verbose:
-            print(f"          REJECTED: No visual language")
-        return False
-    
+            print(f"          REJECTED: Only {visual_count} visual keywords")
+
+    # Determine if valid
+    is_valid = len(issues) == 0
+
     if verbose:
-        print(f"          ✅ VALID: {len(prompt)} chars, starts correctly, has visual language")
-    
-    return True
+        if is_valid:
+            print(f"          ✅ VALID: {len(prompt)} chars, all checks passed")
+        else:
+            print(f"          ❌ INVALID: {len(issues)} issues")
+
+    return is_valid, issues
 
 
 def advanced_voting_system(
@@ -1100,7 +1224,8 @@ def generate_image_prompts_internal(
     model_profile: str = 'balanced',
     temperature: float = DEFAULT_TEMPERATURE,
     verbose: bool = False,
-    book_id: Optional[str] = None
+    book_id: Optional[str] = None,
+    language: str = 'eng'
 ) -> List[str]:
     """
     Generate exactly 5 high-quality thumbnail prompts using advanced agent council voting.
@@ -1116,9 +1241,16 @@ def generate_image_prompts_internal(
     generation_start_time = datetime.now()
     
     try:
-        # 🔍 BOOK RESEARCH PHASE - Agents will research book content themselves
-        print(f"\n🔍 AGENTS WILL RESEARCH BOOK CONTENT AUTOMATICALLY")
-        print(f"📖 Each agent will search for: plot, characters, themes, visual elements")
+        # 📖 BOOK CONTEXT LOADING - Load actual book content for AI agents
+        print(f"\n📖 Loading book context for AI agents...")
+        book_context = load_book_context_from_chapters(book_id, language, max_chars=1500)
+
+        if book_context:
+            token_estimate = len(book_context) // 4  # Rough token estimate
+            print(f"✓ Loaded ~{token_estimate} tokens of book context (chapter titles + excerpt)")
+        else:
+            print(f"⚠️  No chapter files found - using minimal context")
+            book_context = f"This is a {genre} book by {author}. Genre: {genre}."
         
         # Get relevant examples for multi-shot learning (use mystery as default for example selection)
         relevant_examples = select_relevant_examples("mystery thriller")  # Default to get some examples
@@ -1152,14 +1284,15 @@ def generate_image_prompts_internal(
             print(f"  🤖 {agent_info['name']} working...")
             
             try:
-                # Format agent prompt - agents will research book context themselves
+                # Format agent prompt with book context
                 formatted_prompt = agent_info['prompt_template'].format(
                     book_title=book_title,
                     author=author,
                     narrated_by=narrated_by,
                     part_info=part_info,
                     part_instruction=part_instruction,
-                    example_prompts=example_text
+                    example_prompts=example_text,
+                    book_context=book_context  # Provide actual book content
                 )
                 
                 # Get response from agent
@@ -1181,15 +1314,20 @@ def generate_image_prompts_internal(
                 # Validate and collect prompts
                 valid_prompts = []
                 for i, prompt in enumerate(raw_prompts, 1):
-                    is_valid = validate_prompt_quality(prompt, book_title, author, narrated_by, verbose=verbose)
+                    is_valid, issues = validate_prompt_quality(prompt, book_title, author, narrated_by, verbose=verbose)
                     if verbose:
                         print(f"        📋 Prompt {i}: {'✅ VALID' if is_valid else '❌ REJECTED'}")
                         if not is_valid:
+                            print(f"            Issues: {', '.join(issues)}")
                             print(f"            Preview: {prompt[:100]}...")
-                    
+
                     if is_valid:
                         valid_prompts.append(prompt)
                         all_candidates.append(prompt)
+                    else:
+                        # Log rejected prompt for debugging
+                        if verbose:
+                            print(f"            FULL REJECTED PROMPT: {prompt[:300]}...")
                 
                 # Track agent performance with model info
                 agent_performance[role_key] = {
@@ -1361,7 +1499,8 @@ def generate_image_prompts_for_book(
     metadata_file_path: str,
     model_profile: str = 'balanced',  # Use model profile for multi-model support
     temperature: float = DEFAULT_TEMPERATURE,
-    verbose: bool = True
+    verbose: bool = True,
+    language: str = 'eng'
 ) -> Dict:
     """
     Generate 5 high-quality image prompts per video part using enhanced agent council voting.
@@ -1436,7 +1575,8 @@ def generate_image_prompts_for_book(
                 model_profile=model_profile,  # Use model profile instead of single model
                 temperature=temperature,
                 verbose=verbose,
-                book_id=book_id  # Pass book_id for proper analysis export
+                book_id=book_id,  # Pass book_id for proper analysis export
+                language=language
             )
             
             # Format prompts with metadata
@@ -1545,7 +1685,8 @@ def generate_image_prompts(
     book_title: str,
     author: str,
     narrator: str,
-    model_profile: str = 'balanced'
+    model_profile: str = 'balanced',
+    language: str = 'eng'
 ) -> List[str]:
     """
     MAIN FUNCTION FOR AUDIOBOOK PIPELINE INTEGRATION
@@ -1569,7 +1710,8 @@ def generate_image_prompts(
         narrated_by=narrator,
         book_id=book_id,
         model_profile=model_profile,
-        verbose=True  # Enable debugging to see why we get identical prompts
+        verbose=True,  # Enable debugging to see why we get identical prompts
+        language=language
     )
 
 
@@ -1642,7 +1784,8 @@ def generate_image_prompts_from_foundry(
             narrated_by=audiobook_dict.get('narrator_name', 'Unknown'),
             metadata_file_path=temp_metadata_path,
             model_profile=model_profile,
-            verbose=verbose
+            verbose=verbose,
+            language=language
         )
         
         # If successful, extract prompts and save to foundry structure
@@ -1712,15 +1855,15 @@ def main():
     print("=" * 70)
 
     # Test with real book from foundry structure
-    book_id = "pg1064"  # Use existing book in foundry
+    book_id = "pg76411"  # Use existing book in foundry
     language = "eng"
 
     # Mock audiobook_dict matching production structure
     audiobook_dict = {
         'book_id': book_id,
-        'book_name': 'A Christmas Carol',
-        'author': 'Charles Dickens',
-        'narrator_name': 'LibriVox Community',
+        'book_name': 'The mystery of the Blue Train',
+        'author': 'Agatha Christie',
+        'narrator_name': 'Rowan Whitmore',
         'language': language
     }
 

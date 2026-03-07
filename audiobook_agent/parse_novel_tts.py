@@ -38,43 +38,36 @@ def roman_to_arabic(roman: str) -> int:
 def convert_roman_numerals_in_title(title: str) -> str:
     """Convert Roman numerals in chapter titles to Arabic numbers."""
     import re
-    
-    # Pattern to match Roman numerals (I, II, III, IV, V, VI, VII, VIII, IX, X, etc.)
-    # Word boundaries ensure we don't match parts of words
-    roman_pattern = r'\b([IVXLCDM]+)\b'
-    
-    def replace_roman(match):
-        roman = match.group(1)
-        # Check if it's a valid Roman numeral by trying to convert it
-        arabic = roman_to_arabic(roman)
-        if arabic > 0:
-            return str(arabic)
-        else:
-            # If not valid, return original
-            return roman
-    
-    # Replace Roman numerals in the title
-    converted_title = re.sub(roman_pattern, replace_roman, title)
-    
-    # Also handle specific patterns like "ACT I" -> "ACT 1"
+
+    # Only convert Roman numerals in specific contexts to avoid false positives
+    # like "M." (Monsieur), "D." (initial), etc.
     patterns = [
-        (r'Chapter\s+([IVXLCDM]+)', r'Chapter \1'),
-        (r'Part\s+([IVXLCDM]+)', r'Part \1'),
-        (r'Act\s+([IVXLCDM]+)', r'Act \1'),
-        (r'Scene\s+([IVXLCDM]+)', r'Scene \1'),
-        (r'Book\s+([IVXLCDM]+)', r'Book \1'),
-        (r'^([IVXLCDM]+)\.', r'\1.'),  # Roman numeral at start with period
+        (r'Chapter\s+([IVXLCDM]+)\b', r'Chapter \1'),
+        (r'Part\s+([IVXLCDM]+)\b', r'Part \1'),
+        (r'Act\s+([IVXLCDM]+)\b', r'Act \1'),
+        (r'Scene\s+([IVXLCDM]+)\b', r'Scene \1'),
+        (r'Book\s+([IVXLCDM]+)\b', r'Book \1'),
+        (r'^([IVXLCDM]+)\.', r'\1.'),  # Roman numeral at start with period (like "I.", "II.")
+        (r'^([IVXLCDM]+)\s', r'\1 '),  # Roman numeral at start with space (like "I The", "II The")
     ]
-    
+
+    converted_title = title
+
     for pattern, _ in patterns:
         matches = re.finditer(pattern, converted_title, re.IGNORECASE)
         for match in matches:
             roman = match.group(1)
+            # Only convert if it's a valid Roman numeral with value > 0
+            # and longer than 1 character OR it's in a clear chapter context
             arabic = roman_to_arabic(roman)
             if arabic > 0:
-                converted_title = converted_title.replace(match.group(0), 
+                # Extra check: don't convert single letter M, D, C, L, V, I unless followed by period and space or end
+                # This prevents "M. le Marquis" from becoming "1000. le Marquis"
+                if len(roman) == 1 and not re.match(r'^[IVXLCDM]+\.\s*$', match.group(0)) and not pattern.startswith(r'Chapter|Part|Act|Scene|Book'):
+                    continue
+                converted_title = converted_title.replace(match.group(0),
                     match.group(0).replace(roman, str(arabic)))
-    
+
     return converted_title
 
 
@@ -477,23 +470,46 @@ def extract_chapters_strategy_div(soup: BeautifulSoup) -> List[Dict]:
             title_tag = div.find(tag)
             if title_tag:
                 break
-        
+
         if not title_tag:
             continue
-            
+
+        # Skip non-chapter headings like CONTENTS, ILLUSTRATIONS, etc.
+        title_text = clean_text(title_tag.get_text(separator=' ', strip=True))
+        title_text_upper = title_text.upper()
+
+        # Filter out common front/back matter sections
+        if title_text_upper in ['CONTENTS', 'ILLUSTRATIONS', 'PREFACE', 'FOREWORD',
+                                'INTRODUCTION', 'DEDICATION', 'ACKNOWLEDGMENTS',
+                                'ACKNOWLEDGEMENTS', 'EPILOGUE', 'AFTERWORD', 'NOTES']:
+            continue
+
+        # Only count as chapter if it contains chapter-like keywords OR is long enough to be a title
+        has_chapter_keyword = any(keyword in title_text_upper for keyword in
+                                 ['CHAPTER', 'PART', 'ACT', 'SCENE', 'BOOK', 'SECTION', 'LETTER'])
+
+        # Skip very short titles without chapter keywords (likely just book titles or author names)
+        if not has_chapter_keyword and len(title_text) < 30:
+            continue
+
         chapter_index += 1
-        title = clean_text(title_tag.get_text(separator=' ', strip=True))
-        
-        # Extract paragraphs
+        title = title_text
+
+        # Extract paragraphs from INSIDE the div
         paragraphs = []
         for p in div.find_all('p'):
             text = p.get_text(separator=' ', strip=True)
             if text:
                 cleaned = clean_text(text)
-                if cleaned:
+                # Skip page numbers (e.g., "1", "[Pg 11]") - they're not content
+                if cleaned and not re.match(r'^\[Pg\s+\d+\]$', cleaned) and not re.match(r'^\d+$', cleaned):
+                    # Skip header paragraphs (class="ph1", "ph2", etc.) - these are titles, not content
+                    p_classes = p.get('class', [])
+                    if any(cls.startswith('ph') for cls in p_classes):
+                        continue
                     paragraphs.append(cleaned)
-        
-        # If no paragraphs, check for table content (like Contents)
+
+        # If no paragraphs inside, check for table content (like Contents)
         if not paragraphs:
             tables = div.find_all('table')
             for table in tables:
@@ -503,13 +519,59 @@ def extract_chapters_strategy_div(soup: BeautifulSoup) -> List[Dict]:
                     row_text = row.get_text(separator=' ', strip=True)
                     if row_text:
                         table_items.append(clean_text(row_text))
-                
+
                 if table_items:
                     # Join table items as a paragraph
                     table_text = '. '.join(table_items)
                     if table_text:
                         paragraphs.append(table_text)
-        
+
+        # If still no content inside div, look AFTER the div (pg69087 style)
+        if not paragraphs:
+            current = div.find_next_sibling()
+            # Find next chapter div to know where to stop
+            next_chapter_div = None
+            temp = div.find_next_sibling()
+            while temp:
+                if temp.name == 'div' and 'chapter' in temp.get('class', []):
+                    next_chapter_div = temp
+                    break
+                temp = temp.find_next_sibling()
+
+            while current:
+                # Stop if we hit the next chapter div
+                if next_chapter_div and current == next_chapter_div:
+                    break
+
+                # Skip subhead divs (chapter subtitles)
+                if current.name == 'div' and 'subhead' in current.get('class', []):
+                    current = current.find_next_sibling()
+                    continue
+
+                # Skip figure/image divs
+                if current.name == 'div' and 'fig' in current.get('class', []):
+                    current = current.find_next_sibling()
+                    continue
+
+                # Collect paragraph content
+                if current.name == 'p':
+                    text = current.get_text(separator=' ', strip=True)
+                    if text:
+                        cleaned = clean_text(text)
+                        if cleaned:
+                            paragraphs.append(cleaned)
+                elif current.name == 'div':
+                    # Check for paragraphs inside divs (but not chapter divs)
+                    if 'chapter' not in current.get('class', []):
+                        for p in current.find_all('p'):
+                            text = p.get_text(separator=' ', strip=True)
+                            if text:
+                                cleaned = clean_text(text)
+                                if cleaned:
+                                    paragraphs.append(cleaned)
+
+                current = current.find_next_sibling()
+
         # If still no content, use the title itself as content for structural chapters
         if not paragraphs:
             # This handles title-only chapters (like "ACT I" or book titles)
@@ -707,10 +769,18 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
     
     # Find all chapter anchors (including prologue and CH pattern)
     # Look for both <a> tags with id and headings with id (like <h2 id="CH1">)
-    anchors = soup.find_all('a', id=re.compile(r'^(chap|prol|CH|c)\d+'))
+    # Pattern matches: chap##, prol##, CH##, c##, CHAPTER_I, CHAPTER_II, PLG, PROL, PROLOGUE, id_##, etc.
+    chapter_id_pattern = re.compile(
+        r'^(chap|prol|letter|CH|c)\d+|'  # chap01, CH1, c1, prol01, letter1
+        r'^CHAPTER_[IVXLCDM]+|'    # CHAPTER_I, CHAPTER_II, CHAPTER_III
+        r'^(PLG|PROL|PROLOGUE)$|'  # PROLOGUE variations
+        r'^id_\d+',                # id_1, id_2, id_3, etc. (for pg72824 style)
+        re.IGNORECASE
+    )
+    anchors = soup.find_all('a', id=chapter_id_pattern)
     if not anchors:
-        # Also check for headings with these IDs (for pg61262 style)
-        headings_with_id = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], id=re.compile(r'^(chap|prol|CH|c)\d+'))
+        # Also check for headings with these IDs (for pg61262, pg69087, and pg72824 style)
+        headings_with_id = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], id=chapter_id_pattern)
         anchors = headings_with_id
     
     if not anchors:
@@ -725,11 +795,22 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
         title_parts = []
         
         if anchor.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            # Case: anchor IS the heading (like <h2 id="CH1">)
+            # Case: anchor IS the heading (like <h2 id="CHAPTER_I">)
             heading = anchor
             heading_text = heading.get_text(separator=' ', strip=True)
             if heading_text:
                 title_parts.append(clean_text(heading_text))
+
+            # Check for chapter subtitle in <div class="subhead"> after the chapter div
+            # This handles books like pg69087 where chapters have two-part titles
+            chapter_div = heading.find_parent('div', class_='chapter')
+            if chapter_div:
+                subhead_div = chapter_div.find_next_sibling('div', class_='subhead')
+                if subhead_div:
+                    subhead_text = clean_text(subhead_div.get_text(separator=' ', strip=True))
+                    if subhead_text and title_parts:
+                        # Append subtitle to create "CHAPTER I - SUBTITLE" format
+                        title_parts[0] = f"{title_parts[0]} - {subhead_text}"
         else:
             # Case: anchor inside heading or separate anchor
             heading = anchor.parent
@@ -799,16 +880,16 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
         
         # Set title based on anchor ID type (prioritize specific patterns)
         anchor_id = anchor.get('id', '')
-        if anchor_id.startswith('prol'):
+        if anchor_id.lower().startswith('prol') or anchor_id.upper() in ['PLG', 'PROL', 'PROLOGUE']:
             title = "PROLOGUE"
-        elif anchor_id.startswith('CH'):
-            # Handle CH pattern (e.g., CH1, CH2) - need to extract Roman numeral and chapter title
+        elif anchor_id.startswith('CH') and len(anchor_id) > 2 and anchor_id[2].isdigit():
+            # Handle CH pattern (e.g., CH1, CH2) - only match CHdigit, not CHAPTER_
             ch_title = f"Chapter {chapter_index}"  # Temporary fallback
-            
+
             # Try to get Roman numeral from heading and chapter title from div.chtitle
             if heading and heading.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                 roman_numeral = clean_text(heading.get_text(strip=True))
-                
+
                 # Look for div.chtitle after the heading
                 chtitle_div = heading.find_next_sibling('div', class_='chtitle')
                 if chtitle_div:
@@ -847,13 +928,17 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
 
             if inside_paragraphs:
                 # pg174 style: paragraphs are INSIDE the chapter div
+                # Filter out page number paragraphs like [Pg 11]
                 for p in inside_paragraphs:
                     text = p.get_text(separator=' ', strip=True)
                     if text:
                         cleaned = clean_text(text)
-                        if cleaned:
+                        # Skip page numbers (e.g., "[Pg 11]")
+                        if cleaned and not re.match(r'^\[Pg\s+\d+\]$', cleaned):
                             paragraphs.append(cleaned)
-            else:
+
+            # If we didn't find substantial content inside, look AFTER the div
+            if not paragraphs:
                 # Tom Sawyer style: paragraphs are AFTER the chapter div
                 current = chapter_div.find_next_sibling()
 
@@ -902,48 +987,29 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
             else:
                 # anchor might be inside heading, start from parent's next sibling
                 parent = anchor.parent
-                print(f"    Anchor parent: {parent.name if parent else 'None'}")
 
                 if parent and parent.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                     # For pg174 style: <h2><a id="chap00"></a>THE PREFACE</h2>
                     # We need to start from the heading's next sibling
                     current = parent.find_next_sibling()
-                    print(f"    Starting from heading's next sibling: {current.name if current else 'None'}")
                 else:
                     # If anchor.parent is not a heading, start from anchor itself
                     current = anchor.find_next_sibling()
-                    print(f"    Starting from anchor's next sibling: {current.name if current else 'None'}")
 
-            # Debug: Track paragraph collection
-            paragraph_count = 0
-            elements_checked = 0
-            max_elements = 100  # Safety limit
-
-            print(f"    Starting content extraction for chapter {chapter_index}: {title}")
-            print(f"    Current element after setup: {current.name if current else 'None'}")
-
-            while current and elements_checked < max_elements:
-                elements_checked += 1
-
-                # Debug current element
-                if elements_checked <= 5:  # Log first 5 elements
-                    print(f"    Element {elements_checked}: {current.name}, class={current.get('class', [])}")
-
+            # Collect paragraphs
+            while current:
                 # Stop if we hit the next chapter anchor
                 if next_anchor:
                     # Check if current element contains the next anchor
                     if (current.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and
                         current.find('a', id=next_anchor.get('id'))):
-                        print(f"    Stopping: Found next chapter anchor in {current.name}")
                         break
                     # Also stop if current has the next anchor's ID
                     if current.get('id') == next_anchor.get('id'):
-                        print(f"    Stopping: Current element has next anchor ID")
                         break
 
                 # Stop if we hit another chapter div
                 if current.name == 'div' and 'chapter' in current.get('class', []):
-                    print(f"    Stopping: Found chapter div")
                     break
 
                 # Skip div.chtitle (chapter title div) - we already processed it
@@ -958,9 +1024,6 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
                         cleaned = clean_text(text)
                         if cleaned:
                             paragraphs.append(cleaned)
-                            paragraph_count += 1
-                            if paragraph_count <= 2:  # Log first 2 paragraphs
-                                print(f"    Found paragraph {paragraph_count}: {cleaned[:100]}...")
                 elif current.name == 'div':
                     div_paras = current.find_all('p')
                     for p in div_paras:
@@ -969,9 +1032,6 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
                             cleaned = clean_text(text)
                             if cleaned:
                                 paragraphs.append(cleaned)
-                                paragraph_count += 1
-                                if paragraph_count <= 2:
-                                    print(f"    Found paragraph {paragraph_count} in div: {cleaned[:100]}...")
 
                 current = current.find_next_sibling()
 
@@ -980,10 +1040,7 @@ def extract_chapters_strategy_anchor(soup: BeautifulSoup) -> List[Dict]:
         
         # If no paragraphs found, use title as content
         if not paragraphs:
-            print(f"    WARNING: No paragraphs found for chapter {chapter_index}: {title}")
             paragraphs = [f"[{title}]"]
-        else:
-            print(f"    Total paragraphs found: {len(paragraphs)}")
 
         chapters.append({
             'index': chapter_index,

@@ -24,6 +24,8 @@ input/
 *.mp4
 archive*
 *.jpg
+*.tar.bz2
+*.tar.gz
 audiobooks/*
 foundry/*
 database/*

@@ -7,7 +7,7 @@ from typing import Dict, List
 
 # Configuration
 FOLDER_TIMESTAMP = 'pg1155'
-INPUT_PATH = rf"D:\Projects\pheonix\dev\output\speech\{FOLDER_TIMESTAMP}"
+INPUT_PATH = rf"D:\Projects\KingdomOfViSuReNa\alpha\ComfyUI_windows_portable\ComfyUI\output\speech\{FOLDER_TIMESTAMP}"
 OUTPUT_PATH = rf".\combined_audio\{FOLDER_TIMESTAMP}"
 CHUNK_GAP_MS = 500    # Gap between chunks (was sentence gap)
 CHAPTER_GAP_MS = 1000  # Gap between chapters

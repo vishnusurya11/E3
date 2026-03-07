@@ -227,7 +227,7 @@ def generate_videos_for_book(
         # Setup paths
         base_dir = f"foundry/processing/{book_id}"
         audio_dir = f"{base_dir}/combined_audio"
-        images_dir = f"D:\\Projects\\pheonix\\dev\\output\\images\\{book_id}"
+        images_dir = rf"D:\Projects\KingdomOfViSuReNa\alpha\ComfyUI_windows_portable\ComfyUI\output\images\{book_id}"
         output_dir = output_path or f"{base_dir}/videos"
         
         if verbose:

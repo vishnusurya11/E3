@@ -312,7 +312,7 @@ def move_audio_files_for_book(book_dict: Dict) -> bool:
     print(f"✅ SAFETY CHECK PASSED: All {completed_jobs} jobs completed")
     
     # Source: dev/output/speech/{book_id}/
-    source_dir = Path("D:/Projects/pheonix/dev/output/speech") / book_id
+    source_dir = Path("D:/Projects/KingdomOfViSuReNa/alpha/ComfyUI_windows_portable/ComfyUI/output/speech") / book_id
     
     # Destination: foundry/processing/{book_id}/speech/
     dest_dir = Path("foundry/processing") / book_id / "speech"
@@ -1058,7 +1058,7 @@ def generate_videos_for_book_pipeline(book_dict: Dict) -> bool:
     
     # PRE-VALIDATION: Verify images actually exist before starting video generation
     clean_book_id = book_id.replace('-images', '')
-    images_base_dir = f"D:\\Projects\\pheonix\\dev\\output\\images\\{book_id}"
+    images_base_dir = rf"D:\Projects\KingdomOfViSuReNa\alpha\ComfyUI_windows_portable\ComfyUI\output\images\{book_id}"
     
     if not os.path.exists(images_base_dir):
         print(f"❌ VALIDATION: Images directory not found: {images_base_dir}")
