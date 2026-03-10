@@ -28,6 +28,7 @@ archive*
 *.tar.gz
 audiobooks/*
 foundry/*
+output/
 database/*
 comfyui_jobs/*
 *.log

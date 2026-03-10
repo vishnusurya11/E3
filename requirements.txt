@@ -11,8 +11,10 @@ uvicorn[standard]>=0.23.0
 jinja2>=3.1.0
 
 # AI/LLM dependencies
-langchain>=0.0.350
-langchain-openai>=0.0.5
+langchain>=0.2.0
+langchain-openai>=0.1.0
+langchain-core>=0.2.0
+pydantic>=2.0.0
 
 # Image processing
 Pillow>=10.0.0
@@ -51,9 +53,15 @@ google-api-python-client>=2.0.0  # YouTube Data API v3
 google-auth-oauthlib>=1.0.0  # OAuth2 authentication for YouTube
 google-auth-httplib2>=0.1.0  # HTTP transport for Google APIs
 
-# Additional dependencies found in codebase
-glob2>=0.7  # For advanced file globbing (if needed)
-subprocess32>=3.5.4  # Better subprocess handling (Python 2 backport, optional for Python 3)
+# SVG/PDF rendering (for AI stamp in generate_prompts.py)
+svglib>=1.5.0
+reportlab>=4.0.0
+
+# Audio/TTS dependencies (optional — install separately with pip or uv)
+# CPU:   pip install torch torchaudio
+# CUDA:  pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+# After torch: pip install qwen_tts peft soundfile
+soundfile>=0.12.0  # Audio file I/O (required by qwen_tts, no CUDA needed)
 
 # Development and debugging
 ipython>=8.0.0  # For interactive development

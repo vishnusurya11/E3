@@ -9,8 +9,9 @@ Reads from E3 foundry structure (foundry/{book_id}/):
 Step 0: Character Portraits (1024x1024 square)
 Step 1: Location Images (1280x720 landscape)
 Step 2: Scene Images (one per scene, 1280x720)
-Step 3: Thumbnails/Posters
+Step 3: Thumbnails/Posters + Chapter Cards
 Step 4: Audio (Qwen3-TTS Direct Inference)
+Step 5: Video (encode + concatenate)
 
 Usage:
     python -m audiobook_agent.generate_media foundry/pg174
@@ -70,7 +71,7 @@ COMFYUI_WORKFLOWS = {
 }
 
 # TTS — Qwen3-TTS Direct Inference (Step 4)
-TTS_NARRATION_MODE          = os.environ.get("TTS_NARRATION_MODE", "single_narrator")
+TTS_NARRATION_MODE          = os.environ.get("TTS_NARRATION_MODE", "multi_cast")
 TTS_DEVICE                  = os.environ.get("TTS_DEVICE", "cuda")
 TTS_PRECISION               = os.environ.get("TTS_PRECISION", "bfloat16")
 TTS_MODEL_SIZE              = os.environ.get("TTS_MODEL_SIZE", "1.7B")
@@ -92,7 +93,7 @@ SVG_STAMP_PATH = Path(__file__).parent.parent / "svg" / "AI_stamp_1.svg"
 # ---------------------------------------------------------------------------
 # Local imports — no house_of_novels dependencies
 # ---------------------------------------------------------------------------
-from audiobook_agent.comfyui_trigger import trigger_comfy
+from audiobook_agent.comfyui_trigger import trigger_comfy, upload_image_to_comfyui
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ class GenerationResult:
     location_image_count: int = 0
     scene_image_count: int = 0
     shot_frame_count: int = 0
+    chapter_card_count: int = 0
     video_count: int = 0
     audio_count: int = 0
     step_timings: dict = field(default_factory=dict)
@@ -614,6 +616,7 @@ def _make_error_result(codex_path: Path, error: str, **counts) -> GenerationResu
         location_image_count=counts.get("location_image_count", 0),
         scene_image_count=counts.get("scene_image_count", 0),
         shot_frame_count=counts.get("shot_frame_count", 0),
+        chapter_card_count=counts.get("chapter_card_count", 0),
         video_count=counts.get("video_count", 0),
         audio_count=counts.get("audio_count", 0),
     )
@@ -627,9 +630,9 @@ STEP_NAMES = {
     0: "Character Portraits",
     1: "Location Images",
     2: "Scene Images",
-    3: "Thumbnails/Posters",
+    3: "Thumbnails/Posters + Chapter Cards",
     4: "Audio (Qwen3-TTS Direct)",
-    5: "Video (future)",
+    5: "Video (encode + concatenate)",
 }
 
 
@@ -705,6 +708,7 @@ def run_generation(
     location_image_count = 0
     scene_image_count = 0
     poster_count = 0
+    chapter_card_count = 0
     audio_count = 0
     video_count = 0
     shot_frame_count = 0
@@ -715,6 +719,7 @@ def run_generation(
             location_image_count=location_image_count,
             scene_image_count=scene_image_count,
             poster_count=poster_count,
+            chapter_card_count=chapter_card_count,
             audio_count=audio_count,
             video_count=video_count,
             shot_frame_count=shot_frame_count,
@@ -947,6 +952,101 @@ def run_generation(
         step_timings["step3_thumbnails"] = round(time.time() - step_start, 2)
         print(f">>> Step 3 complete ({step_timings['step3_thumbnails']:.1f}s)")
 
+        # ── Step 3b: Chapter Cards ────────────────────────────────────────
+        chapter_card_prompt = codex.get("metadata", {}).get("chapter_card_prompt", "")
+        if not chapter_card_prompt:
+            print("\n>>> Step 3b — Chapter Cards: no prompt in codex.json — skipping")
+            print("    (run generate_prompts --steps 5 to generate chapter card prompts)")
+        else:
+            print(f"\n>>> Step 3b — Chapter Cards")
+            card_prefix = f"api/{book_id}/chapter_cards/template"
+            cards_dir = Path(COMFYUI_OUTPUT_DIR) / "api" / book_id / "chapter_cards"
+
+            # --- 3b-i: Generate base template image ---
+            print("    3b-i: Generate base chapter card template image")
+            template_img = _find_comfyui_output(card_prefix)
+            if template_img and template_img.exists():
+                print(f"    Template already exists: {template_img.name} (use --no-resume to regenerate)")
+            else:
+                thumb_workflow = get_workflow_path("thumbnail")
+                metadata["workflows_used"]["chapter_card_template"] = Path(thumb_workflow).name
+                print(f"    Workflow: {Path(thumb_workflow).name}")
+                success, gen_data = _generate_image(
+                    chapter_card_prompt, card_prefix, "chapter_card_template",
+                    workflow_path=thumb_workflow, comfyui_url=comfyui_url, timeout=timeout,
+                )
+                if success is None:
+                    print(f"\n>>> ERROR: Cannot connect to ComfyUI at {comfyui_url}")
+                    return _make_error_result(book_dir, f"Cannot connect to ComfyUI: {gen_data.get('error')}", **_counts())
+                elif success:
+                    chapter_card_count += 1
+                    template_img = _find_comfyui_output(card_prefix)
+                    print(f"    Template generated: {template_img.name if template_img else 'unknown'}")
+                else:
+                    print(f"    WARNING: Template generation failed — skipping per-chapter cards")
+
+            # --- 3b-ii: Generate per-chapter cards via Qwen Edit ---
+            template_img = _find_comfyui_output(card_prefix)
+            if template_img and template_img.exists():
+                print(f"\n    3b-ii: Generate per-chapter cards via Qwen Edit")
+                loc_edit_workflow = get_workflow_path("scene_location_edit")
+                metadata["workflows_used"]["chapter_card_edit"] = Path(loc_edit_workflow).name
+                print(f"    Workflow: {Path(loc_edit_workflow).name}")
+
+                # Upload template to ComfyUI input/
+                try:
+                    uploaded_name = upload_image_to_comfyui(template_img, comfyui_url)
+                    print(f"    Uploaded template as: {uploaded_name}")
+                except Exception as e:
+                    print(f"    ERROR: Failed to upload template to ComfyUI: {e}")
+                    uploaded_name = None
+
+                if uploaded_name:
+                    chapters = codex.get("chapters", [])
+                    card_gens = []
+                    for ch in chapters:
+                        ch_num = ch.get("chapter_number", 0)
+                        edit_prompt = ch.get("chapter_card_edit_prompt", "")
+                        if not edit_prompt:
+                            continue
+
+                        ch_card_prefix = f"api/{book_id}/chapter_cards/ch{ch_num:02d}"
+
+                        # Resume check
+                        existing = _find_comfyui_output(ch_card_prefix)
+                        if existing and existing.exists():
+                            print(f"    [ch{ch_num:02d}] exists — skip")
+                            card_gens.append({"chapter": ch_num, "status": "skipped",
+                                              "output_path": str(existing)})
+                            continue
+
+                        print(f"    [ch{ch_num:02d}] {edit_prompt[:60]}...")
+                        success, gen_data = _generate_location_layer(
+                            prompt=edit_prompt,
+                            base_image_name=uploaded_name,
+                            filename_prefix=ch_card_prefix,
+                            label=f"ch{ch_num:02d}_card",
+                            workflow_path=loc_edit_workflow,
+                            comfyui_url=comfyui_url,
+                            timeout=timeout,
+                        )
+                        if success is None:
+                            print(f"\n>>> ERROR: Cannot connect to ComfyUI at {comfyui_url}")
+                            return _make_error_result(book_dir, f"Cannot connect to ComfyUI: {gen_data.get('error')}", **_counts())
+                        elif success:
+                            chapter_card_count += 1
+                            output_file = _find_comfyui_output(ch_card_prefix)
+                            if output_file and SVG_STAMP_PATH.exists():
+                                if _apply_ai_stamp(output_file, SVG_STAMP_PATH):
+                                    print(f"        AI stamp applied")
+                                gen_data["stamped"] = True
+                        card_gens.append({"chapter": ch_num, "generation": gen_data})
+
+                    # Save generation data to codex
+                    codex.setdefault("metadata", {})["chapter_card_generations"] = card_gens
+                    save_codex(codex, book_dir / "codex.json")
+                    print(f"\n>>> Chapter cards complete: {chapter_card_count} generated")
+
     # =========================================================================
     # Step 4: Audio (Qwen3-TTS Direct Inference)
     # =========================================================================
@@ -959,17 +1059,28 @@ def run_generation(
         print(f"    Device: {TTS_DEVICE}, Precision: {TTS_PRECISION}")
         print(f"    Model: Qwen3-TTS-{TTS_MODEL_SIZE}")
 
+        _tts_ok = True
         try:
+            import torch as _t; del _t  # early check — prevents 300+ per-scene errors
             from audiobook_agent.qwen_tts_engine import (
                 QwenTTSEngine, CustomVoiceConfig, CloneVoiceConfig, LoRAVoiceConfig,
             )
-        except ImportError as e:
-            print(f">>> ERROR: Cannot import QwenTTSEngine: {e}")
-            print(">>> Ensure qwen_tts, torch, soundfile, numpy are installed.")
-            return _make_error_result(book_dir, f"TTS import error: {e}", **_counts())
+        except (ImportError, Exception) as e:
+            _tts_ok = False
+            _msg = str(e)
+            if "torch" in _msg:
+                print("\n>>> WARNING: torch is not installed — TTS audio generation skipped.")
+                print(">>>   CPU:  pip install torch torchaudio")
+                print(">>>   CUDA: pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124")
+                print(">>>   Then: pip install qwen_tts peft soundfile")
+            else:
+                print(f"\n>>> WARNING: TTS engine failed to load ({e}) — audio skipped.")
+                print(">>>   Try: uv pip install 'transformers==4.57.3' onnxruntime einops sox librosa --no-build-isolation")
 
         if not analysis_dir.exists():
             print(">>> analysis/ directory not found, skipping audio")
+        elif not _tts_ok:
+            pass  # warning already printed above
         else:
             # Build narrator voice config
             if TTS_NARRATOR_VOICE.get("type") == "clone":
@@ -992,9 +1103,21 @@ def run_generation(
                 pause_within_speaker_ms=TTS_PAUSE_WITHIN_SPEAKER,
             )
 
+            # Load characters from characters.json for multi-cast voice mapping
+            tts_characters = []
+            chars_path = book_dir / "characters.json"
+            if chars_path.exists():
+                chars_data = json.load(open(chars_path, encoding="utf-8"))
+                for char_name, char in chars_data.items():
+                    entry = dict(char)
+                    entry.setdefault("character_id", char_name.upper().replace(" ", "_"))
+                    entry["name"] = char_name
+                    tts_characters.append(entry)
+                print(f"    Characters: {len(tts_characters)} loaded for voice mapping")
+
             lora_dir = (TTS_LORA_ADAPTER_DIR or str(book_dir / "lora_adapters")) if TTS_NARRATION_MODE == "lora" else None
             voice_map = tts_engine.setup_voice_map(
-                characters=[],          # E3 doesn't have structured characters for TTS
+                characters=tts_characters,
                 narrator_config=narrator_config,
                 lora_adapter_dir=lora_dir,
                 fallback_to_design=TTS_LORA_FALLBACK_TO_DESIGN,
@@ -1067,9 +1190,12 @@ def run_generation(
                     if not paragraphs:
                         print(f"\n    [skip] Ch{ch_num} Sc{sc_num}: No paragraphs")
                         continue
-                    prose = " ".join(paragraphs)
-                    audio_script = [{"speaker": "NARRATOR", "text": prose,
-                                     "instruct": "Grounded, deliberate narration."}]
+                    audio_script = scene.get("audio_script")
+                    if not audio_script:
+                        # Fallback: plain prose if generate_audio_scripts hasn't run yet
+                        prose = " ".join(paragraphs)
+                        audio_script = [{"speaker": "NARRATOR", "text": prose,
+                                         "instruct": "Grounded, deliberate narration."}]
 
                     seq_num += 1
                     scene_path = audio_dir / f"{seq_num:03d}_ch{ch_num:02d}_sc{sc_num:02d}.wav"
@@ -1095,7 +1221,10 @@ def run_generation(
                         json.dump(audio_gen_data, f, indent=2, ensure_ascii=False)
 
             audio_count = audio_generated_count
-            tts_engine.close()
+            try:
+                tts_engine.close()
+            except Exception as e:
+                print(f"    [warn] tts_engine.close() error (CUDA state may be corrupted): {e}")
 
             # Final audio generation log
             with open(book_dir / "audio_generation.json", "w", encoding="utf-8") as f:
@@ -1109,96 +1238,246 @@ def run_generation(
         print(f"\n>>> Step 4 complete ({step_timings['step4_audio']:.1f}s): {audio_count} audio files")
 
     # =========================================================================
-    # =========================================================================
-    # Step 5: Final Video (ffmpeg — combine audio WAVs + poster → MP4)
+    # Step 5: Final Video
+    #   Phase A — per-scene clips    → videos/scenes/NNN_chXX_scYY.mp4
+    #   Phase B — chapter videos     → videos/chapters/chXX.mp4
+    #   Phase C — final video        → videos/{book_id}.mp4
     # =========================================================================
     if 5 in steps_to_run:
+        import subprocess
+        import re as _re
+        import wave as _wave
+        from collections import defaultdict as _dd
+
         step_start = time.time()
         print(f"\n{'='*60}")
-        print("STEP 5: Final Video")
+        print("STEP 5: Video  (encode + concatenate)")
         print(f"{'='*60}")
 
-        import subprocess
+        audio_dir    = book_dir / "audio"
+        video_dir    = book_dir / "videos"
+        clips_dir    = video_dir / "scenes"
+        chapters_dir = video_dir / "chapters"
+        for d in (video_dir, clips_dir, chapters_dir):
+            d.mkdir(parents=True, exist_ok=True)
 
-        audio_dir = book_dir / "audio"
-        video_dir = book_dir / "videos"
-        video_dir.mkdir(parents=True, exist_ok=True)
+        poster_dir       = Path(COMFYUI_OUTPUT_DIR) / "api" / book_id / "posters"
+        scene_dir        = Path(COMFYUI_OUTPUT_DIR) / "api" / book_id / "scenes"
+        chapter_cards_dir = Path(COMFYUI_OUTPUT_DIR) / "api" / book_id / "chapter_cards"
 
-        # --- 1. Collect sorted WAV files ---
         wav_files = sorted(audio_dir.glob("*.wav")) if audio_dir.exists() else []
         if not wav_files:
             print(">>> No audio WAV files found — run --steps 4 first")
         else:
-            print(f">>> Found {len(wav_files)} audio files to combine")
+            print(f">>> Found {len(wav_files)} audio files")
 
-            # --- 2. Combine WAVs with ffmpeg concat ---
-            combined_audio = video_dir / f"{book_id}_combined.wav"
-            concat_list = video_dir / "concat_list.txt"
-            with open(concat_list, "w", encoding="utf-8") as f:
-                for wav in wav_files:
-                    f.write(f"file '{wav.as_posix()}'\n")
+            # Fallback image (poster → first scene img → None)
+            poster_imgs  = sorted(poster_dir.glob("*.png")) if poster_dir.exists() else []
+            fallback_img = poster_imgs[0].resolve() if poster_imgs else None
+            if not fallback_img:
+                all_si = sorted(scene_dir.glob("*.png")) if scene_dir.exists() else []
+                fallback_img = all_si[0].resolve() if all_si else None
+            print(f"    Fallback image : {fallback_img.name if fallback_img else 'none (black frame)'}")
 
-            concat_cmd = [
-                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-                "-i", str(concat_list),
-                "-c", "copy", str(combined_audio),
-            ]
-            print(f">>> Combining audio...")
-            proc = subprocess.run(concat_cmd, capture_output=True, text=True)
-            if proc.returncode != 0:
-                print(f">>> ERROR combining audio: {proc.stderr[-500:]}")
-            else:
-                print(f"    Combined audio: {combined_audio.name}")
+            re_scene    = _re.compile(r"^\d+_ch(\d+)_sc(\d+)\.wav$")
+            re_ch_title = _re.compile(r"^\d+_ch(\d+)_title\.wav$")
 
-                # --- 3. Find best poster image ---
-                poster_dir = Path(COMFYUI_OUTPUT_DIR) / "api" / book_id / "posters"
-                scene_dir  = Path(COMFYUI_OUTPUT_DIR) / "api" / book_id / "scenes"
+            def _wav_dur(p):
+                try:
+                    with _wave.open(str(p), "rb") as wf:
+                        return wf.getnframes() / wf.getframerate()
+                except Exception:
+                    return 5.0
 
-                poster_candidates = (
-                    sorted(poster_dir.glob("poster_0001_*_.png")) if poster_dir.exists() else []
-                )
-                if not poster_candidates:
-                    poster_candidates = (
-                        sorted(scene_dir.glob("*.png")) if scene_dir.exists() else []
-                    )
+            def _scene_img(ch, sc):
+                if not scene_dir.exists():
+                    return None
+                imgs = sorted(scene_dir.glob(f"ch{ch:02d}_sc{sc:02d}_*.png"))
+                return imgs[0].resolve() if imgs else None
 
-                if not poster_candidates:
-                    print(">>> No poster/scene image found — run --steps 3 (or 2) first")
+            def _ch_img(ch):
+                # Prefer chapter card if available
+                if chapter_cards_dir.exists():
+                    cards = sorted(chapter_cards_dir.glob(f"ch{ch:02d}_*.png"))
+                    if cards:
+                        return cards[0].resolve()
+                # Fallback to first scene image
+                if not scene_dir.exists():
+                    return None
+                for pat in [f"ch{ch:02d}_sc01_*.png", f"ch{ch:02d}_*.png"]:
+                    imgs = sorted(scene_dir.glob(pat))
+                    if imgs:
+                        return imgs[0].resolve()
+                return None
+
+            # Build segment list; each entry carries its chapter assignment
+            # ch_num=0 → book title (stands alone before chapter 1)
+            segments = []   # (wav_abs, img, dur, ch_num, clip_stem)
+            for wav in wav_files:
+                dur = _wav_dur(wav)
+                m_s = re_scene.match(wav.name)
+                m_c = re_ch_title.match(wav.name)
+                if m_s:
+                    ch = int(m_s.group(1))
+                    img = _scene_img(ch, int(m_s.group(2))) or fallback_img
+                elif m_c:
+                    ch = int(m_c.group(1))
+                    img = _ch_img(ch) or fallback_img
                 else:
-                    cover_image = poster_candidates[0]
-                    print(f"    Cover image : {cover_image.name}")
+                    ch = 0          # book title
+                    img = fallback_img
+                segments.append((wav.resolve(), img, dur, ch, wav.stem))
 
-                    # --- 4. ffmpeg image+audio → MP4 ---
-                    output_mp4 = video_dir / f"{book_id}.mp4"
-                    ffmpeg_cmd = [
+            # Probe resolution from first available image
+            first_img = next((img for _, img, _, _, _ in segments if img), None)
+            vid_w, vid_h = 1024, 1024
+            if first_img:
+                probe = subprocess.run(
+                    ["ffprobe", "-v", "quiet", "-print_format", "json",
+                     "-show_streams", str(first_img)],
+                    capture_output=True, text=True,
+                )
+                if probe.returncode == 0:
+                    import json as _j2
+                    for s in _j2.loads(probe.stdout).get("streams", []):
+                        if s.get("width"):
+                            vid_w, vid_h = s["width"], s["height"]
+                            break
+            vid_w += vid_w % 2
+            vid_h += vid_h % 2
+            scale_filter = (
+                f"scale={vid_w}:{vid_h}:force_original_aspect_ratio=decrease,"
+                f"pad={vid_w}:{vid_h}:(ow-iw)/2:(oh-ih)/2:black,"
+                f"format=yuv420p"
+            )
+            total_dur = sum(d for _, _, d, _, _ in segments)
+            print(f"    Segments   : {len(segments)}")
+            print(f"    Total dur  : {total_dur/60:.1f} min")
+            print(f"    Resolution : {vid_w}x{vid_h}")
+
+            # ── Phase A: encode per-scene clips ──────────────────────────────
+            print(f"\n>>> Phase A — encoding {len(segments)} scene clips → videos/scenes/")
+            done_a = skipped_a = 0
+
+            for idx, (wav_abs, img, dur, ch, stem) in enumerate(segments, 1):
+                clip_path = clips_dir / f"{stem}.mp4"
+
+                if clip_path.exists() and clip_path.stat().st_size > 1000:
+                    skipped_a += 1
+                    print(f"\r    [{idx}/{len(segments)}] skip  {clip_path.name}  ", end="", flush=True)
+                    continue
+
+                if img:
+                    cmd = [
                         "ffmpeg", "-y",
-                        "-loop", "1", "-i", str(cover_image),
-                        "-i", str(combined_audio),
-                        "-c:v", "libx264", "-tune", "stillimage",
+                        "-loop", "1", "-t", f"{dur:.3f}", "-i", str(img),
+                        "-i", str(wav_abs),
+                        "-vf", scale_filter,
+                        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                         "-c:a", "aac", "-b:a", "192k",
-                        "-b:v", "1000k",
-                        "-pix_fmt", "yuv420p",
-                        "-shortest",
-                        "-movflags", "+faststart",
-                        str(output_mp4),
+                        "-shortest", "-movflags", "+faststart",
+                        str(clip_path),
                     ]
-                    print(f">>> Encoding video (this takes a while for long audio)...")
-                    proc = subprocess.Popen(ffmpeg_cmd, stderr=subprocess.PIPE,
-                                            universal_newlines=True)
-                    for line in proc.stderr:
-                        if "time=" in line:
-                            ts = line.split("time=")[1].split()[0]
-                            print(f"\r    Progress: {ts}", end="", flush=True)
-                    proc.wait()
-                    print()
+                else:
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-f", "lavfi",
+                        "-i", f"color=c=black:s={vid_w}x{vid_h}:r=1:d={dur:.3f}",
+                        "-i", str(wav_abs),
+                        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                        "-c:a", "aac", "-b:a", "192k",
+                        "-shortest", "-movflags", "+faststart",
+                        str(clip_path),
+                    ]
 
-                    if proc.returncode == 0 and output_mp4.exists():
-                        size_mb = output_mp4.stat().st_size / 1_048_576
-                        print(f">>> Video created: {output_mp4} ({size_mb:.1f} MB)")
-                        video_count += 1
-                        metadata["video_output"] = str(output_mp4)
-                    else:
-                        print(f">>> ERROR: ffmpeg failed (return code {proc.returncode})")
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode == 0:
+                    done_a += 1
+                    print(f"\r    [{idx}/{len(segments)}] done  {clip_path.name}  ", end="", flush=True)
+                else:
+                    print(f"\n    ERROR [{idx}] {wav_abs.name}: {proc.stderr[-200:]}")
+
+            print(f"\n    Phase A done: {done_a} encoded, {skipped_a} resumed")
+
+            # ── Phase B: concat scenes into chapter videos ────────────────────
+            # Group segments by chapter (preserving order)
+            ch_groups = _dd(list)   # {ch_num: [clip_paths in order]}
+            ch_order  = []
+            for _, _, _, ch, stem in segments:
+                clip_path = clips_dir / f"{stem}.mp4"
+                if clip_path.exists() and clip_path.stat().st_size > 1000:
+                    if ch not in ch_groups:
+                        ch_order.append(ch)
+                    ch_groups[ch].append(clip_path)
+
+            print(f"\n>>> Phase B — building {len(ch_order)} chapter videos → videos/chapters/")
+            chapter_mp4s = []
+            done_b = skipped_b = 0
+
+            for ch in ch_order:
+                clips = ch_groups[ch]
+                label = f"ch{ch:02d}" if ch > 0 else "ch00_title"
+                ch_mp4 = chapters_dir / f"{label}.mp4"
+                chapter_mp4s.append(ch_mp4)
+
+                if ch_mp4.exists() and ch_mp4.stat().st_size > 1000:
+                    skipped_b += 1
+                    print(f"    [skip] {ch_mp4.name}  ({len(clips)} clips)")
+                    continue
+
+                ch_list = chapters_dir / f"{label}_list.txt"
+                with open(ch_list, "w", encoding="utf-8") as f:
+                    for cp in clips:
+                        f.write(f"file '{cp.resolve().as_posix()}'\n")
+
+                proc = subprocess.run([
+                    "ffmpeg", "-y",
+                    "-f", "concat", "-safe", "0", "-i", str(ch_list),
+                    "-c", "copy", "-movflags", "+faststart",
+                    str(ch_mp4),
+                ], capture_output=True, text=True)
+
+                if proc.returncode == 0:
+                    done_b += 1
+                    size_mb = ch_mp4.stat().st_size / 1_048_576
+                    print(f"    [done] {ch_mp4.name}  ({len(clips)} clips, {size_mb:.1f} MB)")
+                else:
+                    print(f"    ERROR {ch_mp4.name}: {proc.stderr[-200:]}")
+
+            print(f"    Phase B done: {done_b} encoded, {skipped_b} resumed")
+
+            # ── Phase C: concat chapter videos into final MP4 ─────────────────
+            existing_ch = [p for p in chapter_mp4s if p.exists() and p.stat().st_size > 1000]
+            if not existing_ch:
+                print(">>> No chapter videos — all failed")
+            else:
+                print(f"\n>>> Phase C — concatenating {len(existing_ch)} chapters → {book_id}.mp4")
+                final_list = video_dir / "chapters_concat.txt"
+                with open(final_list, "w", encoding="utf-8") as f:
+                    for cp in existing_ch:
+                        f.write(f"file '{cp.resolve().as_posix()}'\n")
+
+                output_mp4 = video_dir / f"{book_id}.mp4"
+                proc = subprocess.Popen([
+                    "ffmpeg", "-y",
+                    "-f", "concat", "-safe", "0", "-i", str(final_list),
+                    "-c", "copy", "-movflags", "+faststart",
+                    str(output_mp4),
+                ], stderr=subprocess.PIPE, universal_newlines=True)
+                for line in proc.stderr:
+                    if "time=" in line:
+                        ts = line.split("time=")[1].split()[0]
+                        print(f"\r    Progress: {ts}", end="", flush=True)
+                proc.wait()
+                print()
+
+                if proc.returncode == 0 and output_mp4.exists():
+                    size_mb = output_mp4.stat().st_size / 1_048_576
+                    print(f">>> Final video: {output_mp4} ({size_mb:.1f} MB)")
+                    video_count += 1
+                    metadata["video_output"] = str(output_mp4)
+                else:
+                    print(f">>> ERROR: Phase C concat failed (code {proc.returncode})")
 
         metadata["steps_executed"].append(5)
         step_timings["step5_video"] = round(time.time() - step_start, 2)
@@ -1214,6 +1493,7 @@ def run_generation(
     print(f"    Location images     : {location_image_count}")
     print(f"    Scene images        : {scene_image_count}")
     print(f"    Posters/Thumbnails  : {poster_count}")
+    print(f"    Chapter cards       : {chapter_card_count}")
     print(f"    Audio files         : {audio_count}")
     print(f"    Videos              : {video_count}")
     print(f">>> Metadata: {metadata_path}")
@@ -1226,6 +1506,7 @@ def run_generation(
         location_image_count=location_image_count,
         scene_image_count=scene_image_count,
         shot_frame_count=shot_frame_count,
+        chapter_card_count=chapter_card_count,
         video_count=video_count,
         audio_count=audio_count,
         step_timings=step_timings,
@@ -1255,7 +1536,7 @@ def main():
         nargs="+",
         type=int,
         choices=[0, 1, 2, 3, 4, 5],
-        help="Steps to run: 0=Characters 1=Locations 2=Scenes 3=Thumbnails 4=Audio 5=Video",
+        help="Steps to run: 0=Characters 1=Locations 2=Scenes 3=Thumbnails 4=Audio 5=Video 6=ChapterCards",
     )
     parser.add_argument(
         "--timeout",

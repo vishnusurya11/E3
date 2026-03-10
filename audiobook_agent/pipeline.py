@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 
-def _phase_header(n: int, name: str):
+def _phase_header(n, name: str):
     print(f"\n{'#'*60}")
     print(f"# PHASE {n}: {name}")
     print(f"{'#'*60}")
@@ -69,10 +69,46 @@ def phase3_prompts(book_dir: Path, steps: list = None, model: str = None,
         book_dir=book_dir,
         visual_style_name=style or "classical_illustration",
         model=model or "google/gemini-2.0-flash-lite-001",
-        steps=steps or [1, 2, 3, 4],
+        steps=steps or [1, 2, 3, 4, 5],
         resume=not no_resume,
     )
     print(f">>> Phase 3 complete: {result}")
+
+    # Auto-validate and fix style consistency after prompt generation
+    _validate_style_after_prompts(book_dir, style)
+
+
+def phase3b_audio_scripts(book_dir: Path, model: str = None, no_resume: bool = False):
+    """Generate LangChain audio scripts for all scenes (runs after Phase 3)."""
+    _phase_header("3b", "Generate Audio Scripts")
+    from audiobook_agent.generate_audio_scripts import generate_book_audio_scripts
+    result = generate_book_audio_scripts(
+        book_dir=book_dir,
+        model=model or "openai/gpt-4.1-mini",
+        resume=not no_resume,
+    )
+    print(f">>> Phase 3b complete: {result['generated']} scripts generated")
+
+
+def phase3c_voice_designs(book_dir: Path, model: str = None, no_resume: bool = False):
+    """Generate TTS voice_design + character_style for all characters."""
+    _phase_header("3c", "Generate Voice Designs")
+    from audiobook_agent.generate_voice_designs import generate_voice_designs
+    result = generate_voice_designs(
+        book_dir=book_dir,
+        model=model or "google/gemini-2.0-flash-lite-001",
+        resume=not no_resume,
+    )
+    print(f">>> Phase 3c complete: {result['generated']} voice designs generated")
+
+
+def _validate_style_after_prompts(book_dir: Path, style: str = None):
+    """Run style validator after Phase 3, auto-fixing any inconsistencies."""
+    from audiobook_agent.validate_style import validate_style, print_report
+    report = validate_style(book_dir, style_name=style, auto_fix=True)
+    print_report(report)
+    if not report.ok:
+        print(f">>> Style validator: fixed {report.fixed} inconsistent prompts")
 
 
 def phase4_media(book_dir: Path, steps: list = None, comfyui_url: str = None,
@@ -181,6 +217,13 @@ Examples:
         help="Suppress verbose LLM output",
     )
 
+    # Style validation
+    parser.add_argument(
+        "--validate-style", action="store_true",
+        help="Validate (and auto-fix) style consistency of all image prompts "
+             "without re-running Phase 3. Useful after changing --style.",
+    )
+
     # Phase 5 options
     parser.add_argument(
         "--privacy",
@@ -260,6 +303,16 @@ Examples:
     if 3 in phases:
         phase3_prompts(book_dir, model=args.model, no_resume=args.no_resume,
                        style=args.style)
+        phase3b_audio_scripts(book_dir, model=args.model, no_resume=args.no_resume)
+        phase3c_voice_designs(book_dir, model=args.model, no_resume=args.no_resume)
+    elif 4 in phases and 3 not in phases:
+        # Running Phase 4 directly — ensure audio scripts and voice designs are present
+        phase3b_audio_scripts(book_dir, model=args.model, no_resume=False)
+        phase3c_voice_designs(book_dir, model=args.model, no_resume=False)
+    elif args.validate_style:
+        # Standalone validation without re-running Phase 3
+        print("\n--- Style Validation (standalone) ---")
+        _validate_style_after_prompts(book_dir, style=args.style)
 
     # ------------------------------------------------------------------
     # Phase 4: Generate media (images + audio + video)

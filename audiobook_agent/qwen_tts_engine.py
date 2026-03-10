@@ -593,10 +593,14 @@ class QwenTTSEngine:
                     continue
 
                 voice_desc = self._get_voice_description(char)
-                voice_map[char_key] = DesignVoiceConfig(
+                design_config = DesignVoiceConfig(
                     description=voice_desc,
                     sample_text=f"Hello, my name is {char.get('name', 'unknown')}.",
                 )
+                voice_map[char_key] = design_config  # e.g. "ANTHONY_CADE"
+                original_name = char.get("name", "")
+                if original_name and original_name != char_key:
+                    voice_map[original_name] = design_config  # e.g. "Anthony Cade"
 
         return voice_map
 
@@ -941,4 +945,7 @@ class QwenTTSEngine:
         self._unload_lora()
         self._lora_clone_cache.clear()
         if _torch is not None:
-            _torch.cuda.empty_cache()
+            try:
+                _torch.cuda.empty_cache()
+            except Exception:
+                pass  # CUDA context may be corrupted after illegal memory access

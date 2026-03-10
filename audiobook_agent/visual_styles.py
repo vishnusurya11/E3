@@ -100,3 +100,32 @@ def get_style_by_name(style_name: str) -> VisualStyle:
 def list_styles() -> list[str]:
     """Return available style names."""
     return list(VISUAL_STYLES.keys())
+
+
+# ---------------------------------------------------------------------------
+# Chapter card font descriptions — matched to visual styles
+# Used by generate_prompts.py Step 5 for chapter title card template prompts
+# ---------------------------------------------------------------------------
+
+CHAPTER_CARD_FONTS: dict[str, str] = {
+    "classical_illustration": (
+        "elegant Victorian serif display font, gold leaf letterpress, ornate flourishes"
+    ),
+    "anime": (
+        "bold modern sans-serif with subtle glow effects, clean and sharp"
+    ),
+    "oil_painting": (
+        "classical Roman capitals, chiseled stone texture, aged gold"
+    ),
+    "gothic_illustration": (
+        "ornate blackletter gothic font, art nouveau flourishes, dark elegance"
+    ),
+    "cartoon": (
+        "playful rounded bold font, colorful drop shadow, hand-drawn quality"
+    ),
+}
+
+
+def get_chapter_card_font(style_name: str) -> str:
+    """Return the chapter card font description for a visual style."""
+    return CHAPTER_CARD_FONTS.get(style_name, CHAPTER_CARD_FONTS["classical_illustration"])

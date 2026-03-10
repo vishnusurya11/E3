@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prompt Generation Pipeline — Characters, Locations, Scenes, Thumbnails
+Prompt Generation Pipeline — Characters, Locations, Scenes, Thumbnails, Chapter Cards
 
 Reads entity data from foundry/{book_id}/ and generates AI image prompts.
 
@@ -8,6 +8,7 @@ Step 1: Character image prompts  (characters.json → adds image_prompt per char
 Step 2: Location image prompts   (derived from scene data → updates locations.json)
 Step 3: Scene image prompts      (analysis/chapter_*_analysis.json → scene_image_prompt per scene)
 Step 4: Thumbnail prompts        (4-agent council → thumbnail_prompts.json)
+Step 5: Chapter card prompt      (codex.json → metadata.chapter_card_prompt + per-chapter edit prompts)
 
 Output layout (all added inside foundry/{book_id}/):
     characters.json       — character.image_prompt added
@@ -37,7 +38,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 
-from audiobook_agent.visual_styles import get_default_style, get_style_by_name, list_styles, VisualStyle
+from audiobook_agent.visual_styles import get_default_style, get_style_by_name, list_styles, VisualStyle, get_chapter_card_font
 
 load_dotenv()
 
@@ -590,30 +591,36 @@ def generate_scene_prompts(
 # Step 4: Thumbnail prompts — 4-agent council
 # =============================================================================
 
-# Genre-specific examples for Dorian Gray / gothic Victorian audiobooks
-_GOTHIC_EXAMPLES = [
+# Genre-neutral cinematic poster examples — demonstrate composition format
+_POSTER_EXAMPLES = [
     (
-        "Anime style illustration, create a YouTube thumbnail combining 4 gothic Victorian elements: "
-        "(1) a hauntingly handsome young man with unaging golden hair standing before an ornate oval "
-        "portrait frame that shows his corrupted soul aging grotesquely, (2) a dandy aristocrat in "
-        "tailored black evening coat whispering corrupting philosophy, (3) swirling dark green absinthe "
-        "and yellow decadent gold representing aesthetic pleasure masking moral rot, (4) London fog and "
-        "candlelight creating dramatic chiaroscuro shadows in a Victorian townhouse. Palette: midnight "
-        "black, blood crimson, decadent gold, pale ivory, fog gray. Title typography: book title in "
-        "ornate Victorian display font with aged gold effects, clearly readable on mobile. "
-        "anime art style, cel shaded, vibrant saturated colors, Studio Ghibli inspired, "
-        "expressive character design, high quality anime"
+        "Classical illustration artwork, cinematic book poster composition, a dramatic "
+        "one-sheet key art depicting a brooding figure in period attire standing at the "
+        "threshold of a grand doorway, half in warm golden candlelight, half in cold "
+        "moonlit shadow — a visual metaphor for moral duality. Volumetric fog drifts "
+        "through the scene creating atmospheric depth layers. Background: a sweeping "
+        "cityscape silhouette with spires and gaslit streets. Foreground: symbolic objects "
+        "(wilting flowers, an ornate mirror) ground the narrative. Title typography: "
+        "\"BOOK TITLE\" in bold cinematic display font with metallic gold effects, centered "
+        "upper third. \"by Author Name\" in elegant smaller serif below. Palette: deep "
+        "midnight black, burnished gold, blood crimson accents, ivory highlights. Film "
+        "grain texture, dramatic chiaroscuro lighting, theatrical poster layout. "
+        "classical illustration style, detailed pen and ink with watercolor wash, "
+        "Victorian era aesthetic, rich cross-hatching, warm sepia tones, museum-quality "
+        "fine art illustration, highly detailed"
     ),
     (
-        "Classical illustration artwork, YouTube thumbnail showing split Victorian composition: "
-        "(1) pristine youthful face on left — classical portrait beauty, flawless skin, blue eyes, "
-        "golden hair, dandy orchid buttonhole, (2) same face on right aged and rotting inside the cursed "
-        "portrait frame — grotesque mirror of corruption, (3) London gaslit street below with fog and "
-        "opium den shadows, (4) art nouveau floral border of wilting roses framing the moral duality. "
-        "Palette: warm ivory versus rotting sepia, with accent scarlet and gold. Title in bold Victorian "
-        "serif across center splitting the dual image. "
-        "classical illustration style, detailed pen and ink with watercolor wash, Victorian era aesthetic, "
-        "museum-quality fine art illustration, highly detailed"
+        "Anime style illustration, cinematic book poster key art, a striking split "
+        "composition: the protagonist's face dominates the upper half — intense eyes "
+        "reflecting a pivotal moment, wind-swept hair, dramatic rim lighting. Below, "
+        "a sweeping landscape establishing the story world — architecture, atmospheric "
+        "weather, tiny figures suggesting scale and adventure. Bold diagonal energy lines "
+        "connect the two halves. Title typography: \"BOOK TITLE\" in bold modern display "
+        "font with subtle glow effects across the center divide. \"by Author Name\" in "
+        "clean sans-serif at bottom. Palette: teal and orange complementary contrast, "
+        "with accent hot pink and electric blue. Volumetric god rays, lens flare, "
+        "anamorphic bokeh. anime art style, cel shaded, vibrant saturated colors, "
+        "Studio Ghibli inspired, expressive character design, high quality anime"
     ),
 ]
 
@@ -621,38 +628,44 @@ _THUMBNAIL_AGENT_ROLES = {
     "visual_director": {
         "name": "Visual Composition Director",
         "focus": (
-            "VISUAL IMPACT: bold composition balance, strong focal point, clear depth layers, "
-            "colors that pop against YouTube's white interface"
+            "CINEMATIC POSTER COMPOSITION: bold one-sheet key art layout, strong focal "
+            "point, dramatic depth layers (foreground objects, mid-ground subject, "
+            "background atmosphere), colors that pop against YouTube's white interface, "
+            "theatrical lighting, film grain texture"
         ),
     },
     "story_specialist": {
         "name": "Story Visual Specialist",
         "focus": (
-            "EMOTIONAL CORE: capture Dorian Gray's Faustian bargain — beauty vs corruption, "
-            "aesthetic pleasure vs moral decay, Oscar Wilde's wit and tragedy"
+            "EMOTIONAL CORE: capture the book's central conflict and emotional tension, "
+            "the protagonist's defining struggle, the story's most iconic visual moment "
+            "— convey the theme through character pose, symbolic objects, and atmospheric mood"
         ),
     },
     "engagement_expert": {
         "name": "Engagement Psychology Expert",
         "focus": (
-            "MAXIMUM CLICK-THROUGH: curiosity triggers (split compositions, hidden secrets), "
-            "bold saturated palette, mobile-optimized hierarchy, attention-grabbing title"
+            "MAXIMUM CLICK-THROUGH: curiosity triggers (split compositions, hidden details, "
+            "dramatic reveals), bold saturated palette, mobile-optimized hierarchy, "
+            "attention-grabbing title placement, cinematic color grading (teal-orange, "
+            "complementary contrast)"
         ),
     },
     "genre_master": {
-        "name": "Genre Visual Master",
+        "name": "Genre & Period Visual Master",
         "focus": (
-            "GOTHIC VICTORIAN conventions: dark elegance, art nouveau flourishes, "
-            "Aubrey Beardsley/Oscar Wilde aesthetic, dual nature symbolism"
+            "GENRE AUTHENTICITY: period-accurate visual conventions, genre-defining aesthetic "
+            "tropes, art movement references appropriate to the era, authentic atmospheric "
+            "details (architecture, fashion, lighting technology of the period)"
         ),
     },
 }
 
 _AGENT_PROMPT = """\
-You are a {agent_name} creating YouTube thumbnails for an audiobook.
+You are a {agent_name} creating CINEMATIC BOOK POSTERS for a YouTube audiobook.
 
 BOOK: "{book_title}" by {author}
-GENRE: Gothic Victorian drama — beauty, moral corruption, Faustian bargain, aestheticism
+PERIOD/SETTING: {period_setting}
 
 VISUAL STYLE: {style_name}
 STYLE PREFIX (start EVERY prompt with this): "{style_prefix}"
@@ -660,38 +673,50 @@ STYLE SUFFIX (end EVERY prompt with this): "{style_suffix}"
 
 YOUR FOCUS: {focus}
 
-KEY CHARACTERS:
+KEY CHARACTERS (describe by appearance ONLY, never by name):
 {char_descriptions}
 
-REFERENCE EXAMPLES (follow this format):
+KEY STORY MOMENTS:
+{key_moments}
+
+REFERENCE EXAMPLES (follow this cinematic poster composition format):
 {examples}
 
-TASK: Generate exactly 3 thumbnail prompts that:
+TASK: Generate exactly 3 cinematic book poster prompts that:
 1. START with the style prefix
-2. Combine 3-5 iconic story elements in ONE compelling {style_name} composition
-3. Include TITLE TYPOGRAPHY: "{book_title}" in BOLD display font integrated into the image
-4. Use colors that POP on YouTube (list specific colors in the prompt)
-5. END with the style suffix
+2. Use MOVIE POSTER composition: one-sheet key art layout, dramatic focal point,
+   atmospheric depth layers (foreground/mid/background), cinematic lighting
+3. Include TITLE TYPOGRAPHY: "{book_title}" in BOLD cinematic display font,
+   prominent and readable — upper or center placement
+4. Include AUTHOR CREDIT: "by {author}" in elegant smaller font below the title
+5. Combine 3-5 iconic story elements into ONE striking poster composition
+6. Include a specific NAMED COLOR PALETTE that pops on YouTube
+7. Add cinematic texture: film grain, volumetric lighting, dramatic shadows
+8. END with the style suffix
 
-Each prompt: 150-200 words, single paragraph. Output EXACTLY 3 prompts separated by blank lines.
+POSTER KEYWORDS to weave in: cinematic book poster, key art, one-sheet composition,
+theatrical lighting, dramatic chiaroscuro, depth of field, film grain texture
+
+Each prompt: 150-250 words, single flowing paragraph.
+Output EXACTLY 3 prompts separated by blank lines.
 No numbering, no headers — just 3 paragraphs."""
 
 _VOTING_PROMPT = """\
-Score these {n} YouTube thumbnail prompts for "{book_title}".
+Score these {n} cinematic book poster prompts for "{book_title}" by {author}.
 
 Criteria (1-10 each):
-1. visual_impact — grabs attention instantly? bold composition and focal point?
-2. story_capture — captures the gothic Victorian essence of the book?
-3. style_match   — properly uses the {style_name} style (prefix and suffix present)?
-4. typography    — title "{book_title}" integrated as readable bold display font?
-5. mobile_clarity — works at small 320px thumbnail size?
-6. color_impact  — bold YouTube-optimized colors?
+1. visual_impact  — instantly grabs attention? bold cinematic composition and focal point?
+2. story_capture  — captures the book's central theme, conflict, and emotional essence?
+3. style_match    — properly uses the {style_name} style (prefix and suffix present)?
+4. typography     — title "{book_title}" + author "by {author}" integrated as readable display text?
+5. poster_quality — looks like a professional movie/book poster (not just a scene illustration)?
+6. color_impact   — bold, cinematic color palette optimized for YouTube thumbnails?
 
 PROMPTS:
 {prompts_text}
 
 Output ONLY valid JSON, no other text:
-{{"scores": [{{"index": 0, "visual_impact": 8, "story_capture": 7, "style_match": 9, "typography": 8, "mobile_clarity": 7, "color_impact": 8, "total": 47}}, ...], "top_pick_index": 2}}"""
+{{"scores": [{{"index": 0, "visual_impact": 8, "story_capture": 7, "style_match": 9, "typography": 8, "poster_quality": 7, "color_impact": 8, "total": 47}}, ...], "top_pick_index": 2}}"""
 
 
 def _extract_prompts_from_text(text: str) -> list[str]:
@@ -708,7 +733,10 @@ def _extract_prompts_from_text(text: str) -> list[str]:
     for para in paragraphs:
         para = para.strip()
         if len(para) > 100 and any(
-            kw in para.lower() for kw in ["illustration", "anime", "thumbnail", "classical", "gothic"]
+            kw in para.lower() for kw in [
+                "illustration", "anime", "thumbnail", "classical", "gothic",
+                "poster", "cinematic", "key art", "oil painting", "cartoon",
+            ]
         ):
             prompts.append(para)
 
@@ -750,6 +778,29 @@ def _build_key_moments(analysis_dir: Path, max_moments: int = 5) -> str:
     return "\n".join(moments) if moments else "Key moments not available."
 
 
+def _derive_period_setting(book_dir: Path) -> str:
+    """Derive period/setting from analysis data for thumbnail context."""
+    # Gather unique locations from first few analysis files
+    analysis_dir = book_dir / "analysis"
+    locations: list[str] = []
+    if analysis_dir.exists():
+        for ch_file in sorted(analysis_dir.glob("chapter_*_analysis.json"))[:5]:
+            with open(ch_file, encoding="utf-8") as f:
+                data = json.load(f)
+            for scene in data.get("scenes", []):
+                loc = scene.get("location", "")
+                loc_desc = scene.get("location_description", "")
+                if loc and loc.lower() not in ("unknown", "n/a", ""):
+                    entry = f"{loc}: {loc_desc[:80]}" if loc_desc else loc
+                    if entry not in locations:
+                        locations.append(entry)
+                    if len(locations) >= 5:
+                        break
+    if locations:
+        return "; ".join(locations[:5])
+    return "(derive period and setting from the story's characters and themes)"
+
+
 def generate_thumbnail_prompts(
     book_dir: Path,
     book_title: str,
@@ -772,13 +823,16 @@ def generate_thumbnail_prompts(
             chars = json.load(f)
 
     analysis_dir = book_dir / "analysis"
-    key_moments = _build_key_moments(analysis_dir) if analysis_dir.exists() else ""
+    key_moments = _build_key_moments(analysis_dir) if analysis_dir.exists() else "Not available."
     char_descriptions = _build_char_descriptions_for_thumbnail(chars)
+
+    # Derive period/setting from analysis data
+    period_setting = _derive_period_setting(book_dir)
 
     style_name = visual_style["name"]
     style_prefix = visual_style["prefix"]
     style_suffix = visual_style["suffix"]
-    examples_text = "\n\n".join(_GOTHIC_EXAMPLES)
+    examples_text = "\n\n".join(_POSTER_EXAMPLES)
 
     llm_creative = _make_llm(model, temperature=0.8)
     llm_analytical = _make_llm(model, temperature=0.2)
@@ -792,11 +846,13 @@ def generate_thumbnail_prompts(
             agent_name=agent_info["name"],
             book_title=book_title,
             author=author,
+            period_setting=period_setting,
             style_name=style_name,
             style_prefix=style_prefix,
             style_suffix=style_suffix,
             focus=agent_info["focus"],
             char_descriptions=char_descriptions,
+            key_moments=key_moments,
             examples=examples_text,
         )
         if verbose:
@@ -818,9 +874,10 @@ def generate_thumbnail_prompts(
 
     if not all_prompts:
         fallback = (
-            f"{style_prefix} YouTube thumbnail for \"{book_title}\", featuring Dorian Gray's "
-            f"dual nature — pristine beauty versus corrupted portrait, gothic Victorian London setting, "
-            f"bold crimson and gold palette, title in ornate display font. {style_suffix}"
+            f'{style_prefix} cinematic book poster for "{book_title}" by {author}, '
+            f"dramatic one-sheet key art composition, protagonist in atmospheric setting, "
+            f"bold title typography in cinematic display font, film grain texture, "
+            f"volumetric lighting, dramatic chiaroscuro. {style_suffix}"
         )
         return {
             "prompts": [fallback],
@@ -838,6 +895,7 @@ def generate_thumbnail_prompts(
     voting_prompt = _VOTING_PROMPT.format(
         n=len(all_prompts),
         book_title=book_title,
+        author=author,
         style_name=style_name,
         prompts_text=prompts_text,
     )
@@ -977,6 +1035,148 @@ def apply_ai_stamp(
 
 
 # =============================================================================
+# Step 5: Chapter card template prompt
+# =============================================================================
+
+_CHAPTER_CARD_SYSTEM = """\
+You are a cinematic concept artist creating a CHAPTER TITLE CARD background image prompt.
+
+The image will serve as a reusable template for all chapter cards in the audiobook.
+Actual chapter titles will be overlaid via AI image editing in post-production.
+
+VISUAL STYLE:
+START your prompt with EXACTLY this prefix: "{style_prefix}"
+END your prompt with EXACTLY this suffix: "{style_suffix}"
+
+COMPOSITION RULES:
+- Book cover layout composition — atmospheric scene inspired by the book's world
+- CENTER of the image must contain PLACEHOLDER TEXT: "CHAPTER I" on one line,
+  "CHAPTER TITLE" below in larger font — use {font_style} typography
+- The center area must remain visually clean so text is readable
+- All world details (objects, architecture, symbols) around the EDGES of the frame
+- Heavy dark vignette on all four edges, darkest at corners
+- Subject/environment in lower third, negative space with fog/shadow in upper area
+
+ATMOSPHERE:
+- Cinematic, symmetrical, similar to movie/TV title cards (Game of Thrones, True Detective)
+- Hint at the world and lore of the book through iconic objects, locations, symbols
+- Muted desaturated palette, maximum two dominant tones + accent color
+- Volumetric fog, chiaroscuro lighting, film grain texture
+- Do NOT recreate specific scenes — focus on mood, symbolism, atmosphere
+
+FONT STYLE:
+- The placeholder text should be described as: {font_style}
+- This establishes the typography style so the AI editor maintains it per chapter
+
+Generate EXACTLY ONE image generation prompt. Single flowing paragraph, 150-250 words.
+"""
+
+
+def generate_chapter_card_prompt(
+    book_dir: Path,
+    book_title: str,
+    visual_style: VisualStyle,
+    visual_style_name: str,
+    model: str,
+    resume: bool = True,
+    verbose: bool = True,
+) -> int:
+    """Generate a chapter card template prompt and per-chapter edit prompts.
+
+    Stores:
+      - codex.json → metadata.chapter_card_prompt  (the image generation prompt)
+      - codex.json → chapters[].chapter_card_edit_prompt  (per-chapter edit instruction)
+
+    Returns: 1 if prompt was generated, 0 if skipped (resume).
+    """
+    codex_path = book_dir / "codex.json"
+    if not codex_path.exists():
+        print("  codex.json not found, skipping")
+        return 0
+
+    with open(codex_path, encoding="utf-8") as f:
+        codex = json.load(f)
+
+    meta = codex.setdefault("metadata", {})
+
+    # Resume check
+    if resume and meta.get("chapter_card_prompt"):
+        if verbose:
+            print("  Chapter card prompt already exists, skipping (use --no-resume to regenerate)")
+        return 0
+
+    font_style = get_chapter_card_font(visual_style_name)
+
+    system_prompt = _CHAPTER_CARD_SYSTEM.format(
+        style_prefix=visual_style["prefix"],
+        style_suffix=visual_style["suffix"],
+        font_style=font_style,
+    )
+
+    # Build a brief book summary for context
+    chapters = codex.get("chapters", [])
+    chapter_titles = [ch.get("title", f"Chapter {ch.get('chapter_number', i+1)}")
+                      for i, ch in enumerate(chapters)]
+    chapters_summary = ", ".join(chapter_titles[:10])
+    if len(chapter_titles) > 10:
+        chapters_summary += f"... ({len(chapter_titles)} chapters total)"
+
+    human_msg = (
+        f'BOOK: "{book_title}"\n'
+        f"CHAPTERS: {chapters_summary}\n\n"
+        f"Generate ONE chapter title card template prompt for this book."
+    )
+
+    llm = ChatOpenAI(
+        model=model,
+        openai_api_key=OPENROUTER_KEY,
+        openai_api_base=OPENROUTER_BASE,
+        temperature=0.8,
+    )
+
+    if verbose:
+        print(f"  Generating chapter card template prompt...")
+
+    response = llm.invoke([SystemMessage(content=system_prompt), HumanMessage(content=human_msg)])
+    prompt_text = response.content.strip()
+
+    # Store the template prompt
+    meta["chapter_card_prompt"] = prompt_text
+    meta["chapter_card_font_style"] = font_style
+
+    # Generate per-chapter edit prompts
+    for ch in chapters:
+        ch_num = ch.get("chapter_number", 0)
+        ch_title = ch.get("title", f"Chapter {ch_num}")
+        ch["chapter_card_edit_prompt"] = (
+            f"Replace 'CHAPTER I' with 'CHAPTER {_roman(ch_num)}' and "
+            f"'CHAPTER TITLE' with '{ch_title}' in the same font style"
+        )
+
+    with open(codex_path, "w", encoding="utf-8") as f:
+        json.dump(codex, f, indent=2, ensure_ascii=False)
+
+    if verbose:
+        print(f"  Chapter card prompt generated ({len(prompt_text)} chars)")
+        print(f"  Edit prompts added for {len(chapters)} chapters")
+
+    return 1
+
+
+def _roman(num: int) -> str:
+    """Convert an integer to a Roman numeral string."""
+    vals = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+            (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+            (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")]
+    result = ""
+    for value, numeral in vals:
+        while num >= value:
+            result += numeral
+            num -= value
+    return result
+
+
+# =============================================================================
 # Main orchestrator
 # =============================================================================
 
@@ -995,7 +1195,7 @@ def generate_book_prompts(
         book_dir:           Path to foundry/{book_id}/
         visual_style_name:  Style key from visual_styles.py (default: classical_illustration)
         model:              OpenRouter model ID or shorthand
-        steps:              Which steps to run (default: [1,2,3,4])
+        steps:              Which steps to run (default: [1,2,3,4,5])
         resume:             Skip entities that already have prompts
         verbose:            Print progress
 
@@ -1003,7 +1203,7 @@ def generate_book_prompts(
         dict with success status and counts per step
     """
     book_dir = Path(book_dir).resolve()
-    steps_to_run = steps if steps is not None else [1, 2, 3, 4]
+    steps_to_run = steps if steps is not None else [1, 2, 3, 4, 5]
 
     # Resolve model shorthand
     model = AVAILABLE_MODELS.get(model, model)
@@ -1072,6 +1272,23 @@ def generate_book_prompts(
             print(f"  Saved: {thumb_path}")
         results["thumbnail_prompts"] = len(thumbnail_result["prompts"])
 
+    # Step 5: Chapter card template prompt
+    if 5 in steps_to_run:
+        print("\n>>> Step 5: Chapter card template prompt")
+        count = generate_chapter_card_prompt(
+            book_dir, book_title, visual_style, visual_style_name, model, resume, verbose
+        )
+        results["chapter_card_prompted"] = count
+
+    # Persist which visual style was used — read by validate_style.py and future Phase 3 re-runs
+    # Re-read from disk first so we don't overwrite chapter_card_prompt written by Step 5
+    if codex_path.exists():
+        with open(codex_path, encoding="utf-8") as f:
+            codex = json.load(f)
+        codex.setdefault("metadata", {})["visual_style"] = visual_style_name
+        with open(codex_path, "w", encoding="utf-8") as f:
+            json.dump(codex, f, indent=2, ensure_ascii=False)
+
     if verbose:
         print(f"\n{'='*60}")
         print("Prompt generation complete!")
@@ -1097,6 +1314,7 @@ Steps:
   2: Location image prompts   (from scene analysis data)
   3: Scene image prompts      (analysis/chapter_*_analysis.json)
   4: Thumbnail prompts        (4-agent council → thumbnail_prompts.json)
+  5: Chapter card prompt      (codex.json → metadata.chapter_card_prompt)
 
 Models:
   {', '.join(AVAILABLE_MODELS.keys())}
@@ -1122,8 +1340,8 @@ Examples:
         help="Visual style for all prompts. Default: classical_illustration",
     )
     parser.add_argument(
-        "--steps", nargs="+", type=int, choices=[1, 2, 3, 4],
-        help="Steps to run (default: all 4). Example: --steps 1 2",
+        "--steps", nargs="+", type=int, choices=[1, 2, 3, 4, 5],
+        help="Steps to run (default: all 5). Example: --steps 1 2",
     )
     parser.add_argument(
         "--no-resume", action="store_true",
