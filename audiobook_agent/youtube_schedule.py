@@ -14,6 +14,10 @@ Table schema:
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+_PT = ZoneInfo("America/Los_Angeles")
+_UTC = ZoneInfo("UTC")
 
 SCHEDULE_DB = Path(r"D:\Projects\GlobalDatabases\visurena_studio.db")
 
@@ -102,9 +106,12 @@ def release_slots(book_id: str, env: str = "alpha") -> int:
 
 def time_slot_to_publish_at(time_slot: str) -> str:
     """
-    Convert schedule time_slot to YouTube publishAt ISO 8601 format.
+    Convert Seattle/Pacific time_slot to YouTube publishAt (UTC ISO 8601).
 
-    "202603101000" -> "2026-03-10T10:00:00.000Z"
+    Handles DST automatically (America/Los_Angeles).
+    "202603101000" (10:00 AM PDT, UTC-7) -> "2026-03-10T17:00:00.000Z"
+    "202612101000" (10:00 AM PST, UTC-8) -> "2026-12-10T18:00:00.000Z"
     """
-    dt = datetime.strptime(time_slot, "%Y%m%d%H%M")
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    dt_local = datetime.strptime(time_slot, "%Y%m%d%H%M").replace(tzinfo=_PT)
+    dt_utc = dt_local.astimezone(_UTC)
+    return dt_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")

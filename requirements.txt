@@ -49,6 +49,7 @@ pydub>=0.25.0  # For audio processing and combining
 pytz>=2023.3  # For timezone handling in gutenberg_cli.py
 
 # YouTube API
+tzdata>=2024.1  # zoneinfo timezone data for Windows (DST-aware schedule conversion)
 google-api-python-client>=2.0.0  # YouTube Data API v3
 google-auth-oauthlib>=1.0.0  # OAuth2 authentication for YouTube
 google-auth-httplib2>=0.1.0  # HTTP transport for Google APIs
