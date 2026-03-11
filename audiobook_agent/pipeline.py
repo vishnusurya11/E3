@@ -130,14 +130,14 @@ def phase4_media(book_dir: Path, steps: list = None, comfyui_url: str = None,
 
 
 def phase5_upload(book_dir: Path, privacy: str = None, model: str = None):
-    """Upload final video to YouTube."""
-    _phase_header(5, "YouTube Upload")
-    from audiobook_agent.youtube_upload import upload_book_video
-    result = upload_book_video(book_dir, privacy=privacy, model=model)
+    """Upload per-chapter videos to YouTube with schedule integration."""
+    _phase_header(5, "YouTube Upload (per-chapter)")
+    from audiobook_agent.youtube_upload import upload_book_chapters
+    result = upload_book_chapters(book_dir, privacy=privacy, model=model)
     if not result.success:
         print(f">>> Phase 5 ERROR: {result.error}")
         sys.exit(1)
-    print(f">>> Phase 5 complete: {result.video_url}")
+    print(f">>> Phase 5 complete: {result.uploaded}/{result.total_chapters} chapters uploaded")
     return result
 
 

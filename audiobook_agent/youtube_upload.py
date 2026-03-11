@@ -280,6 +280,29 @@ def _add_to_playlist(youtube, video_id: str, playlist_id: str):
         print(f"  Playlist add failed (non-fatal): {e}")
 
 
+def _create_playlist(youtube, title: str, description: str = "") -> Optional[str]:
+    """Create a new public YouTube playlist. Returns playlist_id or None on failure."""
+    try:
+        response = youtube.playlists().insert(
+            part="snippet,status",
+            body={
+                "snippet": {
+                    "title": title[:150],
+                    "description": description or f"Complete audiobook: {title}",
+                },
+                "status": {
+                    "privacyStatus": "public",
+                },
+            },
+        ).execute()
+        playlist_id = response["id"]
+        print(f"  Playlist created: {title} ({playlist_id})")
+        return playlist_id
+    except Exception as e:
+        print(f"  Playlist creation failed (non-fatal): {e}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Main upload function
 # ---------------------------------------------------------------------------
@@ -408,6 +431,241 @@ def upload_book_video(
 
 
 # ---------------------------------------------------------------------------
+# Per-chapter upload with schedule integration
+# ---------------------------------------------------------------------------
+
+def _chapter_metadata(book_title: str, author: str, chapter_title: str, part: int, total: int):
+    """Generate programmatic YouTube metadata for a single chapter."""
+    title = f"{book_title} - Part {part} of {total}"[:100]
+    description = (
+        f"{book_title} by {author}\n\n"
+        f"Chapter {part}: {chapter_title}\n"
+        f"Part {part} of {total}\n\n"
+        f"Listen to the complete audiobook — subscribe and turn on notifications "
+        f"so you never miss a chapter.\n\n"
+        f"#audiobook #{book_title.replace(' ', '').lower()[:30]} "
+        f"#{author.split(',')[0].replace(' ', '').lower()[:20]} "
+        f"#classiclit #literature #booktube"
+    )
+    tags = [
+        "audiobook", "classic literature", book_title.lower()[:40],
+        author.lower()[:30], "literature", "audiobooks", "storytelling",
+        f"part {part}", "chapter audiobook", "classic books",
+    ]
+    return title, description, tags
+
+
+@dataclass
+class ChapterUploadResult:
+    success: bool
+    total_chapters: int = 0
+    uploaded: int = 0
+    playlist_id: str = ""
+    chapters: list = field(default_factory=list)
+    error: str = ""
+
+
+def upload_book_chapters(
+    book_dir,
+    privacy: str = None,
+    model: str = None,
+) -> ChapterUploadResult:
+    """
+    Upload per-chapter videos with schedule database integration.
+
+    Discovers chapter videos at videos/chapters/chXX.mp4, claims schedule
+    slots from visurena_studio.db, and uploads each chapter with scheduled
+    publishing and shared thumbnail.
+    """
+    try:
+        from googleapiclient.http import MediaFileUpload
+    except ImportError:
+        return ChapterUploadResult(
+            success=False,
+            error="google-api-python-client not installed. Run: pip install google-api-python-client google-auth-oauthlib",
+        )
+
+    book_dir = Path(book_dir)
+    book_id = book_dir.name
+
+    # --- Discover chapter videos ---
+    chapters_dir = book_dir / "videos" / "chapters"
+    if not chapters_dir.exists():
+        return ChapterUploadResult(
+            success=False,
+            error=f"No chapters directory: {chapters_dir}. Run Phase 4 step 5 first.",
+        )
+
+    # Match chXX.mp4 (skip ch00_title.mp4)
+    chapter_vids = sorted([
+        f for f in chapters_dir.glob("ch*.mp4")
+        if not f.name.endswith("_title.mp4") and f.name != "ch00.mp4"
+    ])
+    if not chapter_vids:
+        return ChapterUploadResult(
+            success=False,
+            error=f"No chapter videos found in {chapters_dir}",
+        )
+
+    total = len(chapter_vids)
+    print(f"\nYouTube Per-Chapter Upload: {total} chapters")
+
+    # --- Load codex ---
+    codex_path = book_dir / "codex.json"
+    if not codex_path.exists():
+        return ChapterUploadResult(success=False, error=f"codex.json not found in {book_dir}")
+    codex = json.loads(codex_path.read_text(encoding="utf-8"))
+    book_title = codex.get("title", book_id)
+    author = codex.get("author", "Unknown")
+    chapters_meta = codex.get("chapters", [])
+
+    print(f"  Book   : {book_title} by {author}")
+    print(f"  Videos : {total} chapters")
+
+    # --- Claim schedule slots ---
+    try:
+        from audiobook_agent.youtube_schedule import claim_slots, release_slots
+        slots = claim_slots(book_id, book_title, total)
+        print(f"  Slots  : {total} claimed ({slots[0]['time_slot']} -> {slots[-1]['time_slot']})")
+    except Exception as e:
+        print(f"  Schedule: FAILED ({e}) — uploading without schedule")
+        slots = [{"part": i + 1, "time_slot": "", "publish_at": ""} for i in range(total)]
+
+    # --- Authenticate ---
+    try:
+        youtube = _get_youtube_service()
+    except Exception as e:
+        return ChapterUploadResult(success=False, error=f"Auth failed: {e}")
+
+    # --- Privacy ---
+    privacy_status = privacy or os.environ.get("YOUTUBE_DEFAULT_PRIVACY", "public")
+
+    # --- Shared thumbnail ---
+    poster_dir = COMFYUI_OUTPUT_DIR / "api" / book_id / "posters"
+    posters = sorted(poster_dir.glob("*.png")) if poster_dir.exists() else []
+    shared_thumb = posters[0] if posters else None
+    print(f"  Thumb  : {shared_thumb.name if shared_thumb else 'none'}")
+
+    # --- Create playlist for this book ---
+    playlist_id = _create_playlist(youtube, book_title)
+
+    # --- Upload each chapter ---
+    uploaded_chapters = []
+    for i, vid_path in enumerate(chapter_vids):
+        slot = slots[i]
+        part = slot["part"]
+        publish_at = slot.get("publish_at", "")
+
+        # Get chapter title from codex if available
+        ch_title = ""
+        if i < len(chapters_meta):
+            ch_title = chapters_meta[i].get("chapter_title", "")
+        if not ch_title:
+            ch_title = vid_path.stem  # fallback to filename
+
+        title, description, tags = _chapter_metadata(
+            book_title, author, ch_title, part, total,
+        )
+
+        print(f"\n  [{part}/{total}] {title}")
+        print(f"    Video: {vid_path.name} ({vid_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        if publish_at:
+            print(f"    Schedule: {publish_at}")
+
+        # Build upload body
+        status_body = {
+            "privacyStatus": privacy_status,
+            "selfDeclaredMadeForKids": False,
+        }
+        if publish_at:
+            status_body["publishAt"] = publish_at
+
+        try:
+            media = MediaFileUpload(
+                str(vid_path),
+                mimetype="video/mp4",
+                resumable=True,
+                chunksize=10 * 1024 * 1024,
+            )
+            insert_request = youtube.videos().insert(
+                part="snippet,status",
+                body={
+                    "snippet": {
+                        "title": title,
+                        "description": description,
+                        "tags": tags[:20],
+                        "categoryId": YOUTUBE_CATEGORY,
+                        "defaultLanguage": "en",
+                        "defaultAudioLanguage": "en",
+                    },
+                    "status": status_body,
+                },
+                media_body=media,
+            )
+            response = _resumable_upload(insert_request)
+        except Exception as e:
+            print(f"    UPLOAD FAILED: {e}")
+            uploaded_chapters.append({
+                "chapter_number": part,
+                "part": f"Part {part} of {total}",
+                "error": str(e),
+            })
+            continue
+
+        video_id = response["id"]
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        print(f"    Uploaded: {video_url}")
+
+        # Set thumbnail
+        if shared_thumb:
+            try:
+                youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(str(shared_thumb), mimetype="image/png"),
+                ).execute()
+                print(f"    Thumbnail set")
+            except Exception as e:
+                print(f"    Thumbnail failed (non-fatal): {e}")
+
+        # Add to playlist
+        if playlist_id:
+            _add_to_playlist(youtube, video_id, playlist_id)
+
+        uploaded_chapters.append({
+            "chapter_number": part,
+            "part": f"Part {part} of {total}",
+            "video_id": video_id,
+            "video_url": video_url,
+            "title": title,
+            "publish_at": publish_at,
+            "time_slot": slot.get("time_slot", ""),
+        })
+
+    # --- Save to codex ---
+    codex.setdefault("metadata", {})["youtube"] = {
+        "upload_mode": "per_chapter",
+        "total_chapters": total,
+        "shared_thumbnail": shared_thumb.name if shared_thumb else "",
+        "playlist_id": playlist_id or "",
+        "chapters": uploaded_chapters,
+    }
+    codex_path.write_text(json.dumps(codex, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\n  Saved to codex.json")
+
+    uploaded_count = sum(1 for c in uploaded_chapters if "video_id" in c)
+    print(f"\n  Upload complete: {uploaded_count}/{total} chapters uploaded")
+
+    return ChapterUploadResult(
+        success=uploaded_count > 0,
+        total_chapters=total,
+        uploaded=uploaded_count,
+        playlist_id=playlist_id or "",
+        chapters=uploaded_chapters,
+        error="" if uploaded_count == total else f"{total - uploaded_count} chapters failed",
+    )
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -443,6 +701,12 @@ Examples:
         default=None,
         help="OpenRouter model for LLM metadata generation (omit = template)",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["single", "chapters"],
+        default="chapters",
+        help="Upload mode: 'chapters' (per-chapter, default) or 'single' (one final video)",
+    )
 
     args = parser.parse_args()
 
@@ -453,13 +717,20 @@ Examples:
         print(f"ERROR: codex.json not found in {args.book_dir}")
         sys.exit(1)
 
-    result = upload_book_video(args.book_dir, privacy=args.privacy, model=args.model)
-
-    if result.success:
-        print(f"\nUpload complete: {result.video_url}")
+    if args.mode == "chapters":
+        result = upload_book_chapters(args.book_dir, privacy=args.privacy, model=args.model)
+        if result.success:
+            print(f"\nUpload complete: {result.uploaded}/{result.total_chapters} chapters")
+        else:
+            print(f"\nUpload FAILED: {result.error}")
+            sys.exit(1)
     else:
-        print(f"\nUpload FAILED: {result.error}")
-        sys.exit(1)
+        result = upload_book_video(args.book_dir, privacy=args.privacy, model=args.model)
+        if result.success:
+            print(f"\nUpload complete: {result.video_url}")
+        else:
+            print(f"\nUpload FAILED: {result.error}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
